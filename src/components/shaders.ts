@@ -1,0 +1,85 @@
+export const vert = /* glsl */ `  
+
+uniform float uTime;
+uniform float uHeight;
+uniform float waveAmplitude;
+uniform float waveFrequency;
+varying float vHeight;
+
+vec3 displace(vec3 point) {
+
+  vec3 p = point;
+
+  p.y += uTime * 2.0;
+
+  gln_tFBMOpts fbmOpts = gln_tFBMOpts(1.0, 0.4, 2.3, 0.4, 1.0, 5, false, false);
+
+  gln_tGerstnerWaveOpts A = gln_tGerstnerWaveOpts(vec2(0.0, -1.0), 0.5, 2.0 * waveFrequency);
+  gln_tGerstnerWaveOpts B = gln_tGerstnerWaveOpts(vec2(0.0, 1.0), 0.25, 4.0 * waveFrequency);
+  gln_tGerstnerWaveOpts C = gln_tGerstnerWaveOpts(vec2(1.0, 1.0), 0.15, 6.0 * waveFrequency);
+  gln_tGerstnerWaveOpts D = gln_tGerstnerWaveOpts(vec2(1.0, 1.0), 0.4, 2.0 * waveFrequency);
+
+  vec3 n = vec3(0.0);
+
+  if(p.z >= uHeight / 2.0) {
+      n.z += gln_normalize(gln_pfbm(p.xy + (uTime * 0.5), fbmOpts)) * waveAmplitude;
+      n += gln_GerstnerWave(p, A, uTime).xzy * waveAmplitude;
+      n += gln_GerstnerWave(p, B, uTime).xzy * 0.5 * waveAmplitude;
+      n += gln_GerstnerWave(p, C, uTime).xzy * 0.25 * waveAmplitude;
+      n += gln_GerstnerWave(p, D, uTime).xzy * 0.2 * waveAmplitude;
+  }
+
+  vHeight = n.z;
+
+  return point + n;
+}  
+
+vec3 orthogonal(vec3 v) {
+  return normalize(abs(v.x) > abs(v.z) ? vec3(-v.y, v.x, 0.0)
+  : vec3(0.0, -v.z, v.y));
+}
+
+vec3 recalcNormals(vec3 newPos) {
+  float offset = 0.001;
+  vec3 tangent = orthogonal(normal);
+  vec3 bitangent = normalize(cross(normal, tangent));
+  vec3 neighbour1 = position + tangent * offset;
+  vec3 neighbour2 = position + bitangent * offset;
+
+  vec3 displacedNeighbour1 = displace(neighbour1);
+  vec3 displacedNeighbour2 = displace(neighbour2);
+
+  vec3 displacedTangent = displacedNeighbour1 - newPos;
+  vec3 displacedBitangent = displacedNeighbour2 - newPos;
+
+  return normalize(cross(displacedTangent, displacedBitangent));
+}
+
+
+void main() {
+  csm_Position = displace(position);
+  csm_Normal = recalcNormals(csm_Position);
+}
+    `;
+
+export const frag = /* glsl */ `
+varying float vHeight;
+
+uniform vec3 waterColor;
+uniform vec3 waterHighlight;
+
+uniform float offset;
+uniform float contrast;
+uniform float brightness;
+
+vec3 calcColor() {
+  float mask = (pow(vHeight, 2.) - offset) * contrast;
+  vec3 diffuseColor = mix(waterColor, waterHighlight, mask);
+  diffuseColor *= brightness;
+  return diffuseColor;
+}
+
+void main() {
+  csm_DiffuseColor = vec4(calcColor(), 1.0);   
+}
+    `;
