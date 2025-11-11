@@ -531,7 +531,7 @@ export const Map9 = forwardRef(
       waterPositionZ,
     } = useWaterControls();
 
-    // Get FallingLeaves controls
+    // Get foliage controls (falling leaves, manual forest)
     const {
       fallingLeavesEnabled,
       fallingLeavesTexture,
@@ -544,6 +544,13 @@ export const Map9 = forwardRef(
       fallingLeavesSpawnCenterX,
       fallingLeavesSpawnCenterY,
       fallingLeavesSpawnCenterZ,
+      forestEnabled,
+      forestNumTrees,
+      forestInnerRadius,
+      forestOuterRadius,
+      forestPositionX,
+      forestPositionY,
+      forestPositionZ,
     } = useControls("🌿 FOLIAGE", {
       fallingLeaves: folder(
         {
@@ -618,39 +625,6 @@ export const Map9 = forwardRef(
         },
         { collapsed: true }
       ),
-    });
-
-    // Get PhysicsDebugCubes controls
-    const { physicsDebugCubesEnabled, physicsDebugCubesSpawnHeight } =
-      useControls("🔧 DEBUG", {
-        physicsDebugCubes: folder(
-          {
-            physicsDebugCubesEnabled: {
-              value: false,
-              label: "📦 Enable Physics Debug Cubes",
-            },
-            physicsDebugCubesSpawnHeight: {
-              value: 20,
-              min: 5,
-              max: 50,
-              step: 1,
-              label: "⬆️ Spawn Height",
-            },
-          },
-          { collapsed: true }
-        ),
-      });
-
-    // Get Forest controls
-    const {
-      forestEnabled,
-      forestNumTrees,
-      forestInnerRadius,
-      forestOuterRadius,
-      forestPositionX,
-      forestPositionY,
-      forestPositionZ,
-    } = useControls("🗺️ MAP 9", {
       forest: folder(
         {
           forestEnabled: {
@@ -703,6 +677,27 @@ export const Map9 = forwardRef(
         { collapsed: true }
       ),
     });
+
+    // Get PhysicsDebugCubes controls
+    const { physicsDebugCubesEnabled, physicsDebugCubesSpawnHeight } =
+      useControls("🔧 DEBUG", {
+        physicsDebugCubes: folder(
+          {
+            physicsDebugCubesEnabled: {
+              value: false,
+              label: "📦 Enable Physics Debug Cubes",
+            },
+            physicsDebugCubesSpawnHeight: {
+              value: 20,
+              min: 5,
+              max: 50,
+              step: 1,
+              label: "⬆️ Spawn Height",
+            },
+          },
+          { collapsed: true }
+        ),
+      });
 
     // Create stable fallback vectors
     const fallbackPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);

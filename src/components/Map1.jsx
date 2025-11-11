@@ -1,5 +1,5 @@
 import { RigidBody } from "@react-three/rapier";
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useEffect } from "react";
 import { useControls, folder } from "leva";
 import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
@@ -65,6 +65,8 @@ import {
   MeshMatcapMaterial,
   MeshDepthMaterial,
 } from "three";
+import { TileMaterial } from "./TileMaterial";
+import { TILE_REFERENCE_SCALE, TILE_DENSITY } from "./tileMaterialConfig";
 
 export const Map1 = ({
   scale = 1,
@@ -74,6 +76,61 @@ export const Map1 = ({
   ...props
 }) => {
   const group = useRef();
+
+  const { buildingGeometry, buildingPosition } = useMemo(() => {
+    const width = 18 * scale;
+    const height = 60 * scale;
+    const depth = 14 * scale;
+    const geometry = new THREE.BoxGeometry(width, height, depth);
+    const tileSize = 1 / TILE_DENSITY;
+
+    const positionAttr = geometry.attributes.position;
+    const normalAttr = geometry.attributes.normal;
+    const uvAttr = geometry.attributes.uv;
+
+    const positionVector = new THREE.Vector3();
+    const normalVector = new THREE.Vector3();
+
+    for (let i = 0; i < uvAttr.count; i++) {
+      positionVector.fromBufferAttribute(positionAttr, i);
+      normalVector.fromBufferAttribute(normalAttr, i);
+
+      const absNormalX = Math.abs(normalVector.x);
+      const absNormalY = Math.abs(normalVector.y);
+      const absNormalZ = Math.abs(normalVector.z);
+
+      if (absNormalX >= absNormalY && absNormalX >= absNormalZ) {
+        const u = (positionVector.z + depth * 0.5) / tileSize;
+        const v = (positionVector.y + height * 0.5) / tileSize;
+        uvAttr.setXY(i, u, v);
+      } else if (absNormalY >= absNormalX && absNormalY >= absNormalZ) {
+        const u = (positionVector.x + width * 0.5) / tileSize;
+        const v = (positionVector.z + depth * 0.5) / tileSize;
+        uvAttr.setXY(i, u, v);
+      } else {
+        const u = (positionVector.x + width * 0.5) / tileSize;
+        const v = (positionVector.y + height * 0.5) / tileSize;
+        uvAttr.setXY(i, u, v);
+      }
+    }
+
+    uvAttr.needsUpdate = true;
+
+    return {
+      buildingGeometry: geometry,
+      buildingPosition: [
+        position[0] - 30 * scale,
+        position[1] + height / 2,
+        position[2] - 20 * scale,
+      ],
+    };
+  }, [scale, position]);
+
+  useEffect(() => {
+    return () => {
+      buildingGeometry.dispose();
+    };
+  }, [buildingGeometry]);
 
   // Simple ground height function for flat plane
   const getGroundHeight = useMemo(
@@ -1302,12 +1359,19 @@ export const Map1 = ({
           receiveShadow
         >
           <planeGeometry args={[200, 200]} />
-          <meshStandardMaterial
-            color="#a0a0a0"
-            metalness={0.3}
-            roughness={0.4}
-            envMapIntensity={1}
-          />
+          <TileMaterial textureScale={TILE_REFERENCE_SCALE} />
+        </mesh>
+      </RigidBody>
+      <RigidBody
+        type="fixed"
+        colliders="cuboid"
+        position={buildingPosition}
+        friction={1}
+        restitution={0}
+      >
+        <mesh castShadow receiveShadow>
+          <primitive object={buildingGeometry} />
+          <TileMaterial textureScale={TILE_DENSITY} />
         </mesh>
       </RigidBody>
       {/* WindFlag to visualize global wind */}
