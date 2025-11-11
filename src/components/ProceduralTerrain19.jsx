@@ -76,7 +76,7 @@ function getTerrainHeight(x, z, noise1, noise2, noise3) {
   return height;
 }
 
-export const ProceduralTerrain18 = forwardRef(
+export const ProceduralTerrain19 = forwardRef(
   (
     {
       size = 4000, // Total map size

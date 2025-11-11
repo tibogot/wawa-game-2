@@ -16,6 +16,7 @@ import { Map15 } from "./Map15";
 import { Map16 } from "./Map16";
 import { Map17 } from "./Map17";
 import { Map18 } from "./Map18";
+import { Map19 } from "./Map19";
 
 const createDefaultProps = () => ({
   scale: 1,
@@ -150,6 +151,12 @@ export const mapDefinitions = {
     getCharacterSpawn: createStaticSpawn([0, 120, 0]),
     requiresTerrainReadyCallback: true,
     supportsTeleport: true,
+  },
+  map19: {
+    component: Map19,
+    getDefaultProps: createDefaultProps,
+    getCharacterSpawn: createStaticSpawn([0, 150, 0]),
+    requiresTerrainReadyCallback: true,
   },
 };
 
