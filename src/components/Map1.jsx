@@ -30,6 +30,8 @@ import { useWindFlagControls } from "./useWindFlagControls";
 import { AdBillboard } from "./AdBillboard";
 import { useAdBillboardControls } from "./useAdBillboardControls";
 import { RipplePlane } from "./RipplePlane";
+import { DeerController } from "./DeerController";
+import { DeerHerd } from "./DeerHerd";
 import { TornadoLeaves } from "./TornadoLeaves";
 import { FloatingLeaves } from "./FloatingLeaves";
 import FallingLeaves from "./FallingLeaves";
@@ -2000,6 +2002,9 @@ export const Map1 = ({
           bvhMargin={0.1}
         />
       )}
+      {/* Wildlife */}
+      <DeerController position={[5, 1, 5]} />
+      <DeerHerd spawnHeight={1} />
     </group>
   );
 };

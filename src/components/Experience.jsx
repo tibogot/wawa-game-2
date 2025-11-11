@@ -27,90 +27,40 @@ import { Map15 } from "./Map15";
 import { Map16 } from "./Map16";
 import { Map17 } from "./Map17";
 import { Map18 } from "./Map18";
-import { DeerController } from "./DeerController";
-import { DeerHerd } from "./DeerHerd";
 import { useLightsControls } from "./useLightsControls";
 import { Csm } from "./Csm";
-import {
-  getSafeSpawnPosition,
-  getTerrainHeightFromTexture,
-} from "../utils/terrainUtils";
+import { getTerrainHeightFromTexture } from "../utils/terrainUtils";
 import { SSAOEffect } from "./SSAOEffect";
 
-const maps = {
-  map1: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map2: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map3: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map4: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map5: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map6: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map7: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map8: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map9: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map10: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map11: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map12: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map13: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map14: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map15: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map16: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map17: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-  map18: {
-    scale: 1,
-    position: [0, 0, 0],
-  },
-};
+const mapNames = [
+  "map1",
+  "map2",
+  "map3",
+  "map4",
+  "map5",
+  "map6",
+  "map7",
+  "map8",
+  "map9",
+  "map10",
+  "map11",
+  "map12",
+  "map13",
+  "map14",
+  "map15",
+  "map16",
+  "map17",
+  "map18",
+];
+
+const createDefaultMapSettings = () => ({
+  scale: 1,
+  position: [0, 0, 0],
+});
+
+const maps = Object.fromEntries(
+  mapNames.map((mapName) => [mapName, createDefaultMapSettings()])
+);
 
 export const Experience = () => {
   const directionalLightRef = useRef();
@@ -118,7 +68,6 @@ export const Experience = () => {
   const [characterSpawnPosition, setCharacterSpawnPosition] = useState([
     0, 10, 0,
   ]);
-  const [deerSpawnPosition, setDeerSpawnPosition] = useState([5, 1, 5]);
   const [isTerrainReady, setIsTerrainReady] = useState(false); // Track terrain readiness
   const [teleportRequest, setTeleportRequest] = useState(null);
 
@@ -294,118 +243,70 @@ export const Experience = () => {
         200,
         0
       );
-      const deerHeight = getTerrainHeightFromTexture(5, 5, null, 4000, 200, 0);
-
       const characterPos = [0, characterHeight + 2, 0];
-      const deerPos = [5, 1, 5]; // Fixed at ground level with slight clearance
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map5") {
       // For Map5 (ZeldaTerrain2), the terrain is positioned so center peak is at Y=0
       // So spawn character at Y=2 (2 units above the center peak)
       const characterPos = [0, 2, 0];
-      const deerPos = [5, 2, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map6") {
       // For Map6 (Zeldaterrain1), simple terrain with basic spawn
       const characterPos = [0, 5, 0];
-      const deerPos = [5, 5, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map7") {
       // For Map7 (ProceduralTerrain2), simple procedural terrain
       const characterPos = [0, 5, 0];
-      const deerPos = [5, 5, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map8") {
       // For Map8 (ProceduralTerrain3), procedural terrain with adjustable flatness
       // Spawn higher to give terrain time to fully initialize physics colliders
       const characterPos = [0, 50, 0];
-      const deerPos = [5, 50, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map9") {
       // For Map9 (ProceduralTerrain4 with Simplex Noise), BOTW-style terrain
       // Spawn higher to give terrain time to fully initialize physics colliders
       const characterPos = [0, 50, 0];
-      const deerPos = [5, 50, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map10") {
       // For Map10 (ZeldaTerrainSmooth), centered peak at Y=0 similar to Map5
       const characterPos = [0, 2, 0];
-      const deerPos = [5, 2, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map11") {
       // For Map11 (HeightMapTerrainSimon), spawn higher to give terrain time to initialize
       const characterPos = [0, 50, 0];
-      const deerPos = [5, 50, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map12") {
       // For Map12 (ProceduralTerrain5), spawn higher to give terrain time to initialize
       const characterPos = [0, 50, 0];
-      const deerPos = [5, 50, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map13") {
       // For Map13 (ProceduralTerrain9), spawn higher to give terrain time to initialize
       const characterPos = [0, 50, 0];
-      const deerPos = [5, 50, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map14") {
       // For Map14 (Simpleterrainblender), spawn above terrain
       const characterPos = [0, 5, 0];
-      const deerPos = [5, 5, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map15") {
       // For Map15 (TileMaterial floor), keep character near origin
       const characterPos = [0, 2, 0];
-      const deerPos = [5, 2, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map16") {
       // For Map16 (TileMaterial floor only), keep character near origin
       const characterPos = [0, 2, 0];
-      const deerPos = [5, 2, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map17") {
       // For Map17 (TileMaterial floor only), keep character near origin
       const characterPos = [0, 2, 0];
-      const deerPos = [5, 2, 5];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else if (map === "map18") {
       // For Map18 (Procedural terrain), spawn slightly above ground until terrain loads
       const characterPos = [0, 120, 0];
-      const deerPos = [15, 120, -10];
-
       setCharacterSpawnPosition(characterPos);
-      setDeerSpawnPosition(deerPos);
     } else {
       // For other maps, use default positions
       setCharacterSpawnPosition([0, 2, 0]);
-      setDeerSpawnPosition([5, 1, 5]);
     }
   }, [map]);
 
@@ -701,19 +602,6 @@ export const Experience = () => {
               characterRotation.current = rot;
             }}
           />
-        )}
-        {/* Only spawn deer when terrain is ready */}
-        {isTerrainReady && (
-          <>
-            <DeerController
-              position={deerSpawnPosition}
-              terrainMesh={terrainMeshRef.current}
-            />
-            <DeerHerd
-              terrainMesh={terrainMeshRef.current}
-              spawnHeight={deerSpawnPosition[1]}
-            />
-          </>
         )}
       </Physics>
       {showTestSphere && (

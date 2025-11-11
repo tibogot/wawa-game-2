@@ -52,6 +52,8 @@ import { ShorelineEffect } from "./ShorelineEffect";
 import { useShorelineEffectControls } from "./useShorelineEffectControls";
 import { ImpostorForest } from "./ImpostorForest";
 import { useImpostorForestControls } from "./useImpostorForestControls";
+import { DeerController } from "./DeerController";
+import { DeerHerd } from "./DeerHerd";
 import { InstancedTrees } from "./InstancedTrees";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
 import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
@@ -727,6 +729,14 @@ export const Map9 = forwardRef(
       [heightmapLookup]
     );
 
+    const deerSpawnPosition = useMemo(() => {
+      const x = 5;
+      const z = 5;
+      const baseHeight = getGroundHeight(x, z);
+      const height = Number.isFinite(baseHeight) ? baseHeight + 1 : 50;
+      return [x, height, z];
+    }, [getGroundHeight]);
+
     // Generate heightmap texture from getGroundHeight for GrassClaude4
     // GrassClaude4 uses shader-based heightmap sampling, so we need a texture
     const { heightmapTexture, terrainHeight, terrainOffset } = useMemo(() => {
@@ -1290,6 +1300,13 @@ export const Map9 = forwardRef(
             characterPushStrength={dynamicLeaves3PushStrength}
             characterSwirlStrength={dynamicLeaves3SwirlStrength}
           />
+        )}
+        {/* Wildlife */}
+        {isTerrainMeshReady && heightmapLookup && (
+          <>
+            <DeerController position={deerSpawnPosition} />
+            <DeerHerd spawnHeight={deerSpawnPosition[1]} />
+          </>
         )}
         {/* Wind Flag */}
         {windFlagEnabled && heightmapLookup && (
