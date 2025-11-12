@@ -1,7 +1,6 @@
 import { useMemo, forwardRef } from "react";
 import * as THREE from "three";
 import { ProceduralTerrain21 } from "./ProceduralTerrain21";
-import { InfiniteWorldSky } from "./InfiniteWorldSky";
 
 export const Map21 = forwardRef(
   (
@@ -12,8 +11,6 @@ export const Map21 = forwardRef(
       onHeightmapReady,
       characterPosition,
       sunDirection = [-0.35, 0.8, -0.2],
-      dayCycleSpeed = 0.02,
-      enableSky = true,
       ...props
     },
     ref
@@ -33,35 +30,17 @@ export const Map21 = forwardRef(
       return [dir.x, dir.y, dir.z];
     }, [sunDirection]);
 
-    const baseSunVector = useMemo(
-      () =>
-        new THREE.Vector3(
-          normalizedSunDirection[0],
-          normalizedSunDirection[1],
-          normalizedSunDirection[2]
-        ),
-      [normalizedSunDirection]
-    );
-
     return (
-      <>
-        {enableSky && (
-          <InfiniteWorldSky
-            baseSunDirection={baseSunVector}
-            dayCycleSpeed={dayCycleSpeed}
-          />
-        )}
-        <ProceduralTerrain21
-          ref={ref}
-          position={position}
-          scale={scale}
-          onTerrainReady={onTerrainReady}
-          onHeightmapReady={onHeightmapReady}
-          playerPosition={characterPosition}
-          sunPosition={normalizedSunDirection}
-          {...props}
-        />
-      </>
+      <ProceduralTerrain21
+        ref={ref}
+        position={position}
+        scale={scale}
+        onTerrainReady={onTerrainReady}
+        onHeightmapReady={onHeightmapReady}
+        playerPosition={characterPosition}
+        sunPosition={normalizedSunDirection}
+        {...props}
+      />
     );
   }
 );

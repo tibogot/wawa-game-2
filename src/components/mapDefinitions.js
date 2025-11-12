@@ -175,14 +175,13 @@ export const mapDefinitions = {
   map21: {
     component: Map21,
     getDefaultProps: createDefaultProps,
-    getCharacterSpawn: createStaticSpawn([0, 220, 0]),
+    getCharacterSpawn: createStaticSpawn([0, 20, 0]),
     requiresTerrainReadyCallback: true,
     passCharacterData: true,
     directionalOverride: [-40, 120, 30],
-    extendProps: () => ({
-      sunDirection: [-0.35, 0.8, -0.2],
-      dayCycleSpeed: 0.02,
-    }),
+    // extendProps: () => ({
+    //   sunDirection: [-0.35, 0.8, -0.2],
+    // }),
   },
 };
 

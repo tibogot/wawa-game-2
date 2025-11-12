@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useLoader } from "@react-three/fiber";
 import { RigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { createNoise2D } from "simplex-noise";
@@ -58,132 +58,6 @@ vec3 getSunReflectionColor(vec3 baseColor, float sunReflection)
     return mix(baseColor, vec3(1.0, 1.0, 1.0), clamp(sunReflection, 0.0, 1.0));
 }
 `;
-
-const getFogColorGLSL = `
-vec3 getFogColor(vec3 baseColor, float depth, vec2 screenUv)
-{
-    float uFogIntensity = 0.0025;
-    vec3 fogColor = texture2D(uFogTexture, screenUv).rgb;
-    
-    float fogIntensity = 1.0 - exp(- uFogIntensity * uFogIntensity * depth * depth );
-    return mix(baseColor, fogColor, fogIntensity);
-}
-`;
-
-const getGrassAttenuationGLSL = `
-float getGrassAttenuation(vec2 position)
-{
-    float distanceAttenuation = distance(uPlayerPosition.xz, position) / uGrassDistance * 2.0;
-    return 1.0 - clamp(0.0, 1.0, smoothstep(0.3, 1.0, distanceAttenuation));
-}
-`;
-
-const vertexShader = /* glsl */ `
-uniform vec3 uPlayerPosition;
-uniform float uLightnessSmoothness;
-uniform float uFresnelOffset;
-uniform float uFresnelScale;
-uniform float uFresnelPower;
-uniform vec3 uSunPosition;
-uniform float uGrassDistance;
-uniform sampler2D uTexture;
-uniform sampler2D uFogTexture;
-
-varying vec3 vColor;
-
-${inverseLerpGLSL}
-${remapGLSL}
-${getSunShadeGLSL}
-${getSunShadeColorGLSL}
-${getSunReflectionGLSL}
-${getSunReflectionColorGLSL}
-${getFogColorGLSL}
-${getGrassAttenuationGLSL}
-
-void main()
-{
-    vec4 modelPosition = modelMatrix * vec4(position, 1.0);
-    vec4 viewPosition = viewMatrix * modelPosition;
-    float depth = - viewPosition.z;
-    gl_Position = projectionMatrix * viewPosition;
-
-    vec4 terrainData = texture2D(uTexture, uv);
-    vec3 normal = terrainData.rgb;
-
-    float slope = 1.0 - abs(dot(vec3(0.0, 1.0, 0.0), normal));
-
-    vec3 viewDirection = normalize(modelPosition.xyz - cameraPosition);
-    vec3 worldNormal = normalize(mat3(modelMatrix[0].xyz, modelMatrix[1].xyz, modelMatrix[2].xyz) * normal);
-    vec3 viewNormal = normalize(normalMatrix * normal);
-
-    vec3 uGrassDefaultColor = vec3(0.52, 0.65, 0.26);
-    vec3 uGrassShadedColor = vec3(0.52 / 1.3, 0.65 / 1.3, 0.26 / 1.3);
-    
-    float grassDistanceAttenuation = getGrassAttenuation(modelPosition.xz);
-    float grassSlopeAttenuation = smoothstep(remap(slope, 0.4, 0.5, 1.0, 0.0), 0.0, 1.0);
-    float grassAttenuation = grassDistanceAttenuation * grassSlopeAttenuation;
-    vec3 grassColor = mix(uGrassShadedColor, uGrassDefaultColor, 1.0 - grassAttenuation);
-
-    vec3 color = grassColor;
-
-    float sunShade = getSunShade(normal);
-    color = getSunShadeColor(color, sunShade);
-
-    float sunReflection = getSunReflection(viewDirection, worldNormal, viewNormal);
-    color = getSunReflectionColor(color, sunReflection);
-
-    vec2 screenUv = (gl_Position.xy / gl_Position.w * 0.5) + 0.5;
-    color = getFogColor(color, depth, screenUv);
-
-    vColor = color;
-}
-`;
-
-const fragmentShader = /* glsl */ `
-uniform sampler2D uGradientTexture;
-
-varying vec3 vColor;
-
-void main()
-{
-    vec3 color = vColor;
-    
-    gl_FragColor = vec4(color, 1.0);
-}
-`;
-
-function createDefaultFogTexture() {
-  const data = new Float32Array([0.6, 0.75, 0.9, 1]);
-  const texture = new THREE.DataTexture(
-    data,
-    1,
-    1,
-    THREE.RGBAFormat,
-    THREE.FloatType
-  );
-  texture.needsUpdate = true;
-  texture.magFilter = THREE.LinearFilter;
-  texture.minFilter = THREE.LinearFilter;
-  texture.wrapS = THREE.ClampToEdgeWrapping;
-  texture.wrapT = THREE.ClampToEdgeWrapping;
-  texture.flipY = false;
-  return texture;
-}
-
-function createDefaultGradientTexture() {
-  const data = new Uint8Array([
-    0xff, 0xff, 0xff, 0xff, 0xa6, 0xc3, 0x3c, 0xff, 0x2f, 0x3d, 0x36, 0xff,
-    0x01, 0x10, 0x18, 0xff,
-  ]);
-  const texture = new THREE.DataTexture(data, 1, 4, THREE.RGBAFormat);
-  texture.needsUpdate = true;
-  texture.magFilter = THREE.LinearFilter;
-  texture.minFilter = THREE.LinearFilter;
-  texture.wrapS = THREE.ClampToEdgeWrapping;
-  texture.wrapT = THREE.ClampToEdgeWrapping;
-  texture.flipY = false;
-  return texture;
-}
 
 function buildIterationsOffsets(maxIterations, rng) {
   const offsets = [];
@@ -547,10 +421,10 @@ export const ProceduralTerrain21 = forwardRef(
       subdivisions = 512,
       seed = "infinite-world",
       precision = 1,
-      lacunarity = 2.05,
-      persistence = 0.45,
+      lacunarity = 1.8,
+      persistence = 0.42,
       maxIterations = 6,
-      baseFrequency = 0.003,
+      baseFrequency = 0.0012,
       baseAmplitude = 180,
       power = 2,
       elevationOffset = 1,
@@ -559,7 +433,6 @@ export const ProceduralTerrain21 = forwardRef(
       canyonPreservation = 65,
       playerPosition,
       sunPosition = new THREE.Vector3(-0.5, -0.5, -0.5),
-      fogTexture,
       grassDistance = 64,
       fresnel = { offset: 0, scale: 0.5, power: 2 },
       lightnessSmoothness = 0.25,
@@ -572,8 +445,41 @@ export const ProceduralTerrain21 = forwardRef(
     const meshRef = useRef();
     const materialRef = useRef();
 
-    const gradientTexture = useMemo(() => createDefaultGradientTexture(), []);
-    const fallbackFogTexture = useMemo(() => createDefaultFogTexture(), []);
+    const terrainPalette = useMemo(
+      () => ({
+        water: new THREE.Color("#3c2a20"),
+        valley: new THREE.Color("#2f4f1f"),
+        grass: new THREE.Color("#3f6f2a"),
+        cliff: new THREE.Color("#6b5234"),
+        peak: new THREE.Color("#d9d9d6"),
+      }),
+      []
+    );
+
+    const elevationBands = useMemo(
+      () => ({
+        water: -20,
+        valley: 12,
+        mountain: 140,
+        peak: 240,
+      }),
+      []
+    );
+
+    const detailTexture = useLoader(
+      THREE.TextureLoader,
+      "/textures/Grass005_1K-JPG_Color.jpg"
+    );
+
+    useEffect(() => {
+      if (!detailTexture) {
+        return;
+      }
+      detailTexture.wrapS = THREE.RepeatWrapping;
+      detailTexture.wrapT = THREE.RepeatWrapping;
+      detailTexture.anisotropy = 8;
+      detailTexture.needsUpdate = true;
+    }, [detailTexture]);
 
     const terrainData = useMemo(
       () =>
@@ -619,39 +525,168 @@ export const ProceduralTerrain21 = forwardRef(
     }, [terrainData]);
 
     const material = useMemo(() => {
-      const uniforms = {
-        uPlayerPosition: { value: new THREE.Vector3() },
-        uGradientTexture: { value: gradientTexture },
-        uLightnessSmoothness: { value: lightnessSmoothness },
-        uFresnelOffset: { value: fresnel.offset ?? 0 },
-        uFresnelScale: { value: fresnel.scale ?? 0.5 },
-        uFresnelPower: { value: fresnel.power ?? 2 },
-        uSunPosition: { value: new THREE.Vector3().copy(sunPosition) },
-        uFogTexture: { value: fogTexture ?? fallbackFogTexture },
-        uGrassDistance: { value: grassDistance },
-        uTexture: { value: terrainData.texture },
-      };
-
-      const shaderMaterial = new THREE.ShaderMaterial({
-        uniforms,
-        vertexShader,
-        fragmentShader,
-        lights: false,
-        fog: false,
-        transparent: false,
+      const meshMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.92,
+        metalness: 0.0,
       });
 
-      shaderMaterial.uniformsNeedUpdate = true;
-      return shaderMaterial;
+      meshMaterial.onBeforeCompile = (shader) => {
+        shader.uniforms.uTexture = { value: terrainData.texture };
+        shader.uniforms.uSunPosition = {
+          value: new THREE.Vector3().copy(sunPosition),
+        };
+        shader.uniforms.uLightnessSmoothness = {
+          value: lightnessSmoothness,
+        };
+        shader.uniforms.uFresnelOffset = { value: fresnel.offset ?? 0 };
+        shader.uniforms.uFresnelScale = { value: fresnel.scale ?? 0.5 };
+        shader.uniforms.uFresnelPower = { value: fresnel.power ?? 2 };
+        shader.uniforms.uColorWater = { value: terrainPalette.water.clone() };
+        shader.uniforms.uColorValley = { value: terrainPalette.valley.clone() };
+        shader.uniforms.uColorGrass = { value: terrainPalette.grass.clone() };
+        shader.uniforms.uColorCliff = { value: terrainPalette.cliff.clone() };
+        shader.uniforms.uColorPeak = { value: terrainPalette.peak.clone() };
+        shader.uniforms.uWaterLevel = { value: elevationBands.water };
+        shader.uniforms.uValleyLevel = { value: elevationBands.valley };
+        shader.uniforms.uMountainLevel = { value: elevationBands.mountain };
+        shader.uniforms.uPeakLevel = { value: elevationBands.peak };
+        shader.uniforms.uDetailTexture = { value: detailTexture };
+        shader.uniforms.uDetailScale = { value: 0.004 };
+        shader.uniforms.uDetailStrength = { value: 0.35 };
+
+        shader.vertexShader = shader.vertexShader.replace(
+          "#include <common>",
+          `#include <common>
+uniform sampler2D uTexture;
+uniform vec3 uSunPosition;
+uniform float uLightnessSmoothness;
+uniform float uFresnelOffset;
+uniform float uFresnelScale;
+uniform float uFresnelPower;
+uniform vec3 uColorWater;
+uniform vec3 uColorValley;
+uniform vec3 uColorGrass;
+uniform vec3 uColorCliff;
+uniform vec3 uColorPeak;
+uniform float uWaterLevel;
+uniform float uValleyLevel;
+uniform float uMountainLevel;
+uniform float uPeakLevel;
+uniform sampler2D uDetailTexture;
+uniform float uDetailScale;
+uniform float uDetailStrength;
+varying vec3 vTerrainColor;
+varying vec3 vWorldPos;
+float hash(vec2 p) {
+  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+  return fract(sin(p.x + p.y) * 43758.5453);
+}
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+${inverseLerpGLSL}
+${remapGLSL}
+${getSunShadeGLSL}
+${getSunShadeColorGLSL}
+${getSunReflectionGLSL}
+${getSunReflectionColorGLSL}`
+        );
+
+        shader.vertexShader = shader.vertexShader.replace(
+          "#include <begin_normal_vertex>",
+          `#include <begin_normal_vertex>
+vec3 bakedNormal = normalize(texture2D(uTexture, uv).rgb);
+objectNormal = bakedNormal;
+`
+        );
+
+        shader.vertexShader = shader.vertexShader.replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>
+vec4 terrainData = texture2D(uTexture, uv);
+vec3 normal = normalize(terrainData.rgb);
+vec4 modelPositionCustom = modelMatrix * vec4(transformed, 1.0);
+vec4 viewPositionCustom = viewMatrix * modelPositionCustom;
+float height = modelPositionCustom.y;
+vWorldPos = modelPositionCustom.xyz;
+float slope = 1.0 - abs(dot(vec3(0.0, 1.0, 0.0), normal));
+vec3 viewDirection = normalize(modelPositionCustom.xyz - cameraPosition);
+vec3 worldNormal = normalize(
+  mat3(modelMatrix[0].xyz, modelMatrix[1].xyz, modelMatrix[2].xyz) * normal
+);
+vec3 viewNormal = normalize(normalMatrix * normal);
+
+vec3 color = uColorWater;
+float tValley = smoothstep(uWaterLevel - 15.0, uValleyLevel + 10.0, height);
+color = mix(color, uColorValley, tValley);
+float tGrass = smoothstep(uValleyLevel - 8.0, uValleyLevel + 35.0, height);
+color = mix(color, uColorGrass, tGrass);
+float tCliff = smoothstep(uMountainLevel - 45.0, uMountainLevel + 25.0, height);
+color = mix(color, uColorCliff, tCliff);
+float tPeak = smoothstep(uPeakLevel - 40.0, uPeakLevel + 10.0, height);
+color = mix(color, uColorPeak, tPeak);
+
+float slopeFactor = smoothstep(0.35, 0.92, slope);
+color = mix(color, uColorCliff, slopeFactor * clamp(height - uWaterLevel, 0.0, 150.0) / 150.0);
+
+float largeNoise = noise(modelPositionCustom.xz * 0.0015);
+float detailNoise = noise(modelPositionCustom.xz * 0.006);
+float variation = (largeNoise * 0.65 + detailNoise * 0.35) * 0.08 - 0.04;
+color *= 1.0 + variation;
+color = clamp(color, 0.0, 1.0);
+
+float sunShade = getSunShade(normal);
+color = getSunShadeColor(color, sunShade);
+// float sunReflection = getSunReflection(viewDirection, worldNormal, viewNormal);
+// color = getSunReflectionColor(color, sunReflection);
+vTerrainColor = clamp(color, 0.0, 1.0);
+`
+        );
+
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <common>",
+          `#include <common>
+varying vec3 vTerrainColor;
+varying vec3 vWorldPos;
+uniform sampler2D uDetailTexture;
+uniform float uDetailScale;
+uniform float uDetailStrength;
+`
+        );
+
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <color_fragment>",
+          `#include <color_fragment>
+diffuseColor.rgb = vTerrainColor;
+vec2 detailUV = vWorldPos.xz * uDetailScale;
+vec3 detailSample = texture2D(uDetailTexture, detailUV).rgb;
+float detailValue = (detailSample.r + detailSample.g + detailSample.b) / 3.0;
+detailValue = mix(1.0, detailValue, uDetailStrength);
+diffuseColor.rgb *= detailValue;
+`
+        );
+
+        meshMaterial.userData.shader = shader;
+      };
+
+      meshMaterial.needsUpdate = true;
+      return meshMaterial;
     }, [
-      gradientTexture,
+      terrainData.texture,
+      sunPosition,
       lightnessSmoothness,
       fresnel,
-      sunPosition,
-      fogTexture,
-      fallbackFogTexture,
-      grassDistance,
-      terrainData.texture,
+      terrainPalette,
+      elevationBands,
+      detailTexture,
     ]);
 
     useEffect(() => {
@@ -702,19 +737,34 @@ export const ProceduralTerrain21 = forwardRef(
 
     useFrame(() => {
       const mat = materialRef.current;
-      if (!mat) {
+      const shader = mat?.userData?.shader;
+      const uniforms = shader?.uniforms;
+      if (!shader || !uniforms) {
         return;
       }
 
-      assignVector(mat.uniforms.uPlayerPosition.value, playerPosition);
-      assignVector(mat.uniforms.uSunPosition.value, sunPosition);
-      mat.uniforms.uGrassDistance.value = grassDistance;
-      mat.uniforms.uLightnessSmoothness.value = lightnessSmoothness;
-      mat.uniforms.uFresnelOffset.value = fresnel.offset ?? 0;
-      mat.uniforms.uFresnelScale.value = fresnel.scale ?? 0.5;
-      mat.uniforms.uFresnelPower.value = fresnel.power ?? 2;
-      mat.uniforms.uTexture.value = terrainData.texture;
-      mat.uniformsNeedUpdate = true;
+      if (uniforms.uSunPosition) {
+        assignVector(uniforms.uSunPosition.value, sunPosition);
+      }
+      if (uniforms.uLightnessSmoothness) {
+        uniforms.uLightnessSmoothness.value = lightnessSmoothness;
+      }
+      if (uniforms.uFresnelOffset) {
+        uniforms.uFresnelOffset.value = fresnel.offset ?? 0;
+      }
+      if (uniforms.uFresnelScale) {
+        uniforms.uFresnelScale.value = fresnel.scale ?? 0.5;
+      }
+      if (uniforms.uFresnelPower) {
+        uniforms.uFresnelPower.value = fresnel.power ?? 2;
+      }
+      if (uniforms.uTexture) {
+        uniforms.uTexture.value = terrainData.texture;
+      }
+      if (uniforms.uDetailTexture) {
+        uniforms.uDetailTexture.value = detailTexture;
+      }
+      shader.uniformsNeedUpdate = true;
     });
 
     return (
@@ -728,6 +778,14 @@ export const ProceduralTerrain21 = forwardRef(
             receiveShadow
           />
         </RigidBody>
+        <mesh
+          position={[0, elevationBands.water, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          receiveShadow={false}
+        >
+          <planeGeometry args={[size, size, 1, 1]} />
+          <meshBasicMaterial color="#36271d" transparent opacity={0.6} />
+        </mesh>
       </group>
     );
   }
