@@ -17,6 +17,8 @@ import { Map16 } from "./Map16";
 import { Map17 } from "./Map17";
 import { Map18 } from "./Map18";
 import { Map19 } from "./Map19";
+import { Map20 } from "./Map20";
+import { Map21 } from "./Map21";
 
 const createDefaultProps = () => ({
   scale: 1,
@@ -157,6 +159,30 @@ export const mapDefinitions = {
     getDefaultProps: createDefaultProps,
     getCharacterSpawn: createStaticSpawn([0, 150, 0]),
     requiresTerrainReadyCallback: true,
+  },
+  map20: {
+    component: Map20,
+    getDefaultProps: createDefaultProps,
+    getCharacterSpawn: createStaticSpawn([0, 220, 0]),
+    requiresTerrainReadyCallback: true,
+    passCharacterData: true,
+    directionalOverride: [-40, 120, 30],
+    extendProps: () => ({
+      sunDirection: [-0.35, 0.8, -0.2],
+      dayCycleSpeed: 0.02,
+    }),
+  },
+  map21: {
+    component: Map21,
+    getDefaultProps: createDefaultProps,
+    getCharacterSpawn: createStaticSpawn([0, 220, 0]),
+    requiresTerrainReadyCallback: true,
+    passCharacterData: true,
+    directionalOverride: [-40, 120, 30],
+    extendProps: () => ({
+      sunDirection: [-0.35, 0.8, -0.2],
+      dayCycleSpeed: 0.02,
+    }),
   },
 };
 
