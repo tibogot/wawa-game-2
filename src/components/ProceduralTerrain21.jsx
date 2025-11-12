@@ -6,55 +6,46 @@ import { createNoise2D } from "simplex-noise";
 import alea from "alea";
 
 const inverseLerpGLSL = `
-float inverseLerp(float v, float minValue, float maxValue)
-{
+float inverseLerp(float v, float minValue, float maxValue) {
     return (v - minValue) / (maxValue - minValue);
 }
 `;
 
 const remapGLSL = `
-float remap(float v, float inMin, float inMax, float outMin, float outMax)
-{
+float remap(float v, float inMin, float inMax, float outMin, float outMax) {
     float t = inverseLerp(v, inMin, inMax);
     return mix(outMin, outMax, t);
 }
 `;
 
 const getSunShadeGLSL = `
-float getSunShade(vec3 normal)
-{
-    float sunShade = dot(normal, - uSunPosition);
+float getSunShade(vec3 normal) {
+    float sunShade = dot(normal, -uSunPosition);
     sunShade = sunShade * 0.5 + 0.5;
-
     return sunShade;
 }
 `;
 
 const getSunShadeColorGLSL = `
-vec3 getSunShadeColor(vec3 baseColor, float sunShade)
-{
-    vec3 shadeColor = baseColor * vec3(0.0, 0.5, 0.7);
-    return mix(baseColor, shadeColor, sunShade);
+vec3 getSunShadeColor(vec3 baseColor, float sunShade) {
+    vec3 shadeColor = baseColor * vec3(0.3, 0.6, 0.8);
+    return mix(baseColor, shadeColor, sunShade * 0.6);
 }
 `;
 
 const getSunReflectionGLSL = `
-float getSunReflection(vec3 viewDirection, vec3 worldNormal, vec3 viewNormal)
-{
+float getSunReflection(vec3 viewDirection, vec3 worldNormal, vec3 viewNormal) {
     vec3 sunViewReflection = reflect(uSunPosition, viewNormal);
     float sunViewStrength = max(0.2, dot(sunViewReflection, viewDirection));
-
     float fresnel = uFresnelOffset + uFresnelScale * (1.0 + dot(viewDirection, worldNormal));
     float sunReflection = fresnel * sunViewStrength;
     sunReflection = pow(sunReflection, uFresnelPower);
-
     return sunReflection;
 }
 `;
 
 const getSunReflectionColorGLSL = `
-vec3 getSunReflectionColor(vec3 baseColor, float sunReflection)
-{
+vec3 getSunReflectionColor(vec3 baseColor, float sunReflection) {
     return mix(baseColor, vec3(1.0, 1.0, 1.0), clamp(sunReflection, 0.0, 1.0));
 }
 `;
@@ -419,23 +410,27 @@ export const ProceduralTerrain21 = forwardRef(
     {
       size = 2000,
       subdivisions = 512,
-      seed = "infinite-world",
+      seed = "zelda-world",
       precision = 1,
-      lacunarity = 1.8,
-      persistence = 0.42,
-      maxIterations = 6,
-      baseFrequency = 0.0012,
-      baseAmplitude = 180,
-      power = 2,
-      elevationOffset = 1,
-      smoothingPasses = 2,
-      smoothingStrength = 0.45,
-      canyonPreservation = 65,
+      lacunarity = 2.2,
+      persistence = 0.48,
+      maxIterations = 5,
+      baseFrequency = 0.0008,
+      baseAmplitude = 85,
+      power = 1.6,
+      elevationOffset = 5,
+      smoothingPasses = 3,
+      smoothingStrength = 0.55,
+      canyonPreservation = 45,
       playerPosition,
-      sunPosition = new THREE.Vector3(-0.5, -0.5, -0.5),
+      sunPosition = new THREE.Vector3(-0.4, -0.6, -0.5),
       grassDistance = 64,
-      fresnel = { offset: 0, scale: 0.5, power: 2 },
-      lightnessSmoothness = 0.25,
+      fresnel = { offset: 0, scale: 0.4, power: 2.5 },
+      lightnessSmoothness = 0.3,
+      detailColorBoost = 2.1,
+      detailScale = 0.12,
+      detailStrength = 0.6,
+      detailNormalStrength = 2,
       onTerrainReady,
       onHeightmapReady,
       ...groupProps
@@ -447,39 +442,52 @@ export const ProceduralTerrain21 = forwardRef(
 
     const terrainPalette = useMemo(
       () => ({
-        water: new THREE.Color("#3c2a20"),
-        valley: new THREE.Color("#2f4f1f"),
-        grass: new THREE.Color("#3f6f2a"),
-        cliff: new THREE.Color("#6b5234"),
-        peak: new THREE.Color("#d9d9d6"),
+        water: new THREE.Color("#2d5a4a"),
+        valley: new THREE.Color("#4a7c3e"),
+        grass: new THREE.Color("#5d9e4b"),
+        lightGrass: new THREE.Color("#7ab86d"),
+        cliff: new THREE.Color("#8b7355"),
+        darkCliff: new THREE.Color("#6b5744"),
+        peak: new THREE.Color("#e8e8e0"),
+        snow: new THREE.Color("#f5f5f0"),
       }),
       []
     );
 
     const elevationBands = useMemo(
       () => ({
-        water: -20,
-        valley: 12,
-        mountain: 140,
-        peak: 240,
+        water: -10,
+        valley: 8,
+        grass: 35,
+        mountain: 65,
+        peak: 90,
       }),
       []
     );
 
     const detailTexture = useLoader(
       THREE.TextureLoader,
-      "/textures/Grass005_1K-JPG_Color.jpg"
+      "/textures/rocky_terrain_02_diff_1k.jpg"
+    );
+    const detailNormalTexture = useLoader(
+      THREE.TextureLoader,
+      "/textures/rocky_terrain_02_nor_gl_1k.jpg"
     );
 
     useEffect(() => {
-      if (!detailTexture) {
-        return;
+      if (detailTexture) {
+        detailTexture.wrapS = THREE.RepeatWrapping;
+        detailTexture.wrapT = THREE.RepeatWrapping;
+        detailTexture.anisotropy = 8;
+        detailTexture.needsUpdate = true;
       }
-      detailTexture.wrapS = THREE.RepeatWrapping;
-      detailTexture.wrapT = THREE.RepeatWrapping;
-      detailTexture.anisotropy = 8;
-      detailTexture.needsUpdate = true;
-    }, [detailTexture]);
+      if (detailNormalTexture) {
+        detailNormalTexture.wrapS = THREE.RepeatWrapping;
+        detailNormalTexture.wrapT = THREE.RepeatWrapping;
+        detailNormalTexture.anisotropy = 8;
+        detailNormalTexture.needsUpdate = true;
+      }
+    }, [detailTexture, detailNormalTexture]);
 
     const terrainData = useMemo(
       () =>
@@ -527,7 +535,7 @@ export const ProceduralTerrain21 = forwardRef(
     const material = useMemo(() => {
       const meshMaterial = new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        roughness: 0.92,
+        roughness: 0.88,
         metalness: 0.0,
       });
 
@@ -540,20 +548,31 @@ export const ProceduralTerrain21 = forwardRef(
           value: lightnessSmoothness,
         };
         shader.uniforms.uFresnelOffset = { value: fresnel.offset ?? 0 };
-        shader.uniforms.uFresnelScale = { value: fresnel.scale ?? 0.5 };
-        shader.uniforms.uFresnelPower = { value: fresnel.power ?? 2 };
+        shader.uniforms.uFresnelScale = { value: fresnel.scale ?? 0.4 };
+        shader.uniforms.uFresnelPower = { value: fresnel.power ?? 2.5 };
         shader.uniforms.uColorWater = { value: terrainPalette.water.clone() };
         shader.uniforms.uColorValley = { value: terrainPalette.valley.clone() };
         shader.uniforms.uColorGrass = { value: terrainPalette.grass.clone() };
+        shader.uniforms.uColorLightGrass = {
+          value: terrainPalette.lightGrass.clone(),
+        };
         shader.uniforms.uColorCliff = { value: terrainPalette.cliff.clone() };
+        shader.uniforms.uColorDarkCliff = {
+          value: terrainPalette.darkCliff.clone(),
+        };
         shader.uniforms.uColorPeak = { value: terrainPalette.peak.clone() };
+        shader.uniforms.uColorSnow = { value: terrainPalette.snow.clone() };
         shader.uniforms.uWaterLevel = { value: elevationBands.water };
         shader.uniforms.uValleyLevel = { value: elevationBands.valley };
+        shader.uniforms.uGrassLevel = { value: elevationBands.grass };
         shader.uniforms.uMountainLevel = { value: elevationBands.mountain };
         shader.uniforms.uPeakLevel = { value: elevationBands.peak };
         shader.uniforms.uDetailTexture = { value: detailTexture };
-        shader.uniforms.uDetailScale = { value: 0.004 };
-        shader.uniforms.uDetailStrength = { value: 0.35 };
+        shader.uniforms.uDetailScale = { value: detailScale };
+        shader.uniforms.uDetailStrength = { value: detailStrength };
+        shader.uniforms.uDetailColorBoost = { value: detailColorBoost };
+        shader.uniforms.uDetailNormalTexture = { value: detailNormalTexture };
+        shader.uniforms.uDetailNormalStrength = { value: detailNormalStrength };
 
         shader.vertexShader = shader.vertexShader.replace(
           "#include <common>",
@@ -567,21 +586,32 @@ uniform float uFresnelPower;
 uniform vec3 uColorWater;
 uniform vec3 uColorValley;
 uniform vec3 uColorGrass;
+uniform vec3 uColorLightGrass;
 uniform vec3 uColorCliff;
+uniform vec3 uColorDarkCliff;
 uniform vec3 uColorPeak;
+uniform vec3 uColorSnow;
 uniform float uWaterLevel;
 uniform float uValleyLevel;
+uniform float uGrassLevel;
 uniform float uMountainLevel;
 uniform float uPeakLevel;
 uniform sampler2D uDetailTexture;
 uniform float uDetailScale;
 uniform float uDetailStrength;
+uniform float uDetailColorBoost;
+uniform sampler2D uDetailNormalTexture;
+uniform float uDetailNormalStrength;
 varying vec3 vTerrainColor;
 varying vec3 vWorldPos;
+varying float vSlope;
+varying vec3 vWorldNormal;
+
 float hash(vec2 p) {
   p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
   return fract(sin(p.x + p.y) * 43758.5453);
 }
+
 float noise(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
@@ -592,6 +622,19 @@ float noise(vec2 p) {
   float d = hash(i + vec2(1.0, 1.0));
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
+
+float fbm(vec2 p) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  float frequency = 1.0;
+  for(int i = 0; i < 4; i++) {
+    value += amplitude * noise(p * frequency);
+    frequency *= 2.0;
+    amplitude *= 0.5;
+  }
+  return value;
+}
+
 ${inverseLerpGLSL}
 ${remapGLSL}
 ${getSunShadeGLSL}
@@ -617,37 +660,65 @@ vec4 modelPositionCustom = modelMatrix * vec4(transformed, 1.0);
 vec4 viewPositionCustom = viewMatrix * modelPositionCustom;
 float height = modelPositionCustom.y;
 vWorldPos = modelPositionCustom.xyz;
+
 float slope = 1.0 - abs(dot(vec3(0.0, 1.0, 0.0), normal));
+
 vec3 viewDirection = normalize(modelPositionCustom.xyz - cameraPosition);
 vec3 worldNormal = normalize(
   mat3(modelMatrix[0].xyz, modelMatrix[1].xyz, modelMatrix[2].xyz) * normal
 );
 vec3 viewNormal = normalize(normalMatrix * normal);
 
+// Multi-scale noise for natural variation
+vec2 worldXZ = modelPositionCustom.xz;
+float macroNoise = fbm(worldXZ * 0.0003);
+float mesoNoise = fbm(worldXZ * 0.002);
+float microNoise = noise(worldXZ * 0.015);
+
+// Blend colors based on height with improved transitions
 vec3 color = uColorWater;
-float tValley = smoothstep(uWaterLevel - 15.0, uValleyLevel + 10.0, height);
+
+float tValley = smoothstep(uWaterLevel - 5.0, uValleyLevel + 8.0, height);
 color = mix(color, uColorValley, tValley);
-float tGrass = smoothstep(uValleyLevel - 8.0, uValleyLevel + 35.0, height);
-color = mix(color, uColorGrass, tGrass);
-float tCliff = smoothstep(uMountainLevel - 45.0, uMountainLevel + 25.0, height);
-color = mix(color, uColorCliff, tCliff);
-float tPeak = smoothstep(uPeakLevel - 40.0, uPeakLevel + 10.0, height);
-color = mix(color, uColorPeak, tPeak);
 
-float slopeFactor = smoothstep(0.35, 0.92, slope);
-color = mix(color, uColorCliff, slopeFactor * clamp(height - uWaterLevel, 0.0, 150.0) / 150.0);
+float tGrass = smoothstep(uValleyLevel - 3.0, uGrassLevel + 12.0, height);
+vec3 grassColor = mix(uColorGrass, uColorLightGrass, microNoise * 0.6 + 0.2);
+color = mix(color, grassColor, tGrass);
 
-float largeNoise = noise(modelPositionCustom.xz * 0.0015);
-float detailNoise = noise(modelPositionCustom.xz * 0.006);
-float variation = (largeNoise * 0.65 + detailNoise * 0.35) * 0.08 - 0.04;
-color *= 1.0 + variation;
+// Cliff coloring based on slope with variation
+float cliffInfluence = smoothstep(0.4, 0.85, slope);
+vec3 cliffColor = mix(uColorCliff, uColorDarkCliff, mesoNoise * 0.5 + 0.25);
+float cliffBlend = cliffInfluence * clamp((height - uWaterLevel) / 80.0, 0.0, 1.0);
+color = mix(color, cliffColor, cliffBlend);
+
+// Mountain peaks with natural snow line
+float tPeak = smoothstep(uMountainLevel - 15.0, uPeakLevel + 8.0, height);
+vec3 peakColor = mix(uColorPeak, uColorSnow, smoothstep(0.0, 1.0, (height - uPeakLevel) / 20.0));
+color = mix(color, peakColor, tPeak);
+
+// Add multi-frequency color variation for realism
+float colorVar1 = macroNoise * 0.12;
+float colorVar2 = mesoNoise * 0.08;
+float colorVar3 = microNoise * 0.06;
+float totalVariation = (colorVar1 + colorVar2 + colorVar3) - 0.13;
+
+// Apply variation with height-based modulation
+float variationStrength = mix(1.0, 0.6, smoothstep(uPeakLevel - 10.0, uPeakLevel + 20.0, height));
+color *= 1.0 + totalVariation * variationStrength;
+
+// Ambient occlusion-like darkening in valleys
+float valleyAO = smoothstep(uValleyLevel + 10.0, uValleyLevel - 5.0, height) * 0.15;
+color *= 1.0 - valleyAO;
+
 color = clamp(color, 0.0, 1.0);
 
+// Improved sun shading
 float sunShade = getSunShade(normal);
 color = getSunShadeColor(color, sunShade);
-// float sunReflection = getSunReflection(viewDirection, worldNormal, viewNormal);
-// color = getSunReflectionColor(color, sunReflection);
+
 vTerrainColor = clamp(color, 0.0, 1.0);
+vSlope = slope;
+vWorldNormal = worldNormal;
 `
         );
 
@@ -656,9 +727,37 @@ vTerrainColor = clamp(color, 0.0, 1.0);
           `#include <common>
 varying vec3 vTerrainColor;
 varying vec3 vWorldPos;
+varying float vSlope;
+varying vec3 vWorldNormal;
 uniform sampler2D uDetailTexture;
 uniform float uDetailScale;
 uniform float uDetailStrength;
+uniform float uDetailColorBoost;
+uniform sampler2D uDetailNormalTexture;
+uniform float uDetailNormalStrength;
+`
+        );
+
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <normal_fragment_maps>",
+          `#include <normal_fragment_maps>
+vec2 detailUVNormal = vWorldPos.xz * uDetailScale;
+vec3 detailNormalSample = texture2D(uDetailNormalTexture, detailUVNormal).xyz * 2.0 - 1.0;
+detailNormalSample.xy *= uDetailNormalStrength;
+detailNormalSample = normalize(detailNormalSample);
+
+vec3 dp1 = dFdx(vWorldPos);
+vec3 dp2 = dFdy(vWorldPos);
+vec2 duv1 = dFdx(detailUVNormal);
+vec2 duv2 = dFdy(detailUVNormal);
+
+vec3 tangent = normalize(dp1 * duv2.y - dp2 * duv1.y);
+vec3 bitangent = normalize(dp2 * duv1.x - dp1 * duv2.x);
+
+mat3 detailTBN = mat3(tangent, bitangent, normalize(vWorldNormal));
+vec3 detailWorldNormal = normalize(detailTBN * detailNormalSample);
+
+normal = normalize(mix(normal, detailWorldNormal, clamp(uDetailNormalStrength, 0.0, 1.0)));
 `
         );
 
@@ -666,11 +765,28 @@ uniform float uDetailStrength;
           "#include <color_fragment>",
           `#include <color_fragment>
 diffuseColor.rgb = vTerrainColor;
+
+// Detail texture with distance-based blending
 vec2 detailUV = vWorldPos.xz * uDetailScale;
-vec3 detailSample = texture2D(uDetailTexture, detailUV).rgb;
-float detailValue = (detailSample.r + detailSample.g + detailSample.b) / 3.0;
-detailValue = mix(1.0, detailValue, uDetailStrength);
-diffuseColor.rgb *= detailValue;
+vec3 detailColor = texture2D(uDetailTexture, detailUV).rgb;
+
+// Fade detail contribution with distance (strong near camera, subtle far away)
+float distanceToCamera = length(vWorldPos - cameraPosition);
+float detailFade = clamp(1.0 - smoothstep(70.0, 240.0, distanceToCamera), 0.0, 1.0);
+
+// Extra falloff on very flat areas to avoid tiling artifacts
+float slopeFactor = smoothstep(0.15, 0.85, vSlope);
+detailFade *= mix(0.5, 1.0, slopeFactor);
+
+float detailMix = clamp(uDetailStrength * detailFade, 0.0, 1.0);
+float colorMix = clamp(detailMix * uDetailColorBoost, 0.0, 1.0);
+
+vec3 paletteColor = diffuseColor.rgb;
+vec3 detailTint = pow(detailColor, vec3(0.85));
+vec3 texturedColor = paletteColor * detailTint;
+
+// Blend towards textured color while keeping base palette influence
+diffuseColor.rgb = mix(paletteColor, texturedColor, colorMix);
 `
         );
 
@@ -687,6 +803,11 @@ diffuseColor.rgb *= detailValue;
       terrainPalette,
       elevationBands,
       detailTexture,
+      detailScale,
+      detailStrength,
+      detailNormalTexture,
+      detailColorBoost,
+      detailNormalStrength,
     ]);
 
     useEffect(() => {
@@ -753,16 +874,31 @@ diffuseColor.rgb *= detailValue;
         uniforms.uFresnelOffset.value = fresnel.offset ?? 0;
       }
       if (uniforms.uFresnelScale) {
-        uniforms.uFresnelScale.value = fresnel.scale ?? 0.5;
+        uniforms.uFresnelScale.value = fresnel.scale ?? 0.4;
       }
       if (uniforms.uFresnelPower) {
-        uniforms.uFresnelPower.value = fresnel.power ?? 2;
+        uniforms.uFresnelPower.value = fresnel.power ?? 2.5;
       }
       if (uniforms.uTexture) {
         uniforms.uTexture.value = terrainData.texture;
       }
       if (uniforms.uDetailTexture) {
         uniforms.uDetailTexture.value = detailTexture;
+      }
+      if (uniforms.uDetailScale) {
+        uniforms.uDetailScale.value = detailScale;
+      }
+      if (uniforms.uDetailStrength) {
+        uniforms.uDetailStrength.value = detailStrength;
+      }
+      if (uniforms.uDetailColorBoost) {
+        uniforms.uDetailColorBoost.value = detailColorBoost;
+      }
+      if (uniforms.uDetailNormalTexture) {
+        uniforms.uDetailNormalTexture.value = detailNormalTexture;
+      }
+      if (uniforms.uDetailNormalStrength) {
+        uniforms.uDetailNormalStrength.value = detailNormalStrength;
       }
       shader.uniformsNeedUpdate = true;
     });
@@ -778,14 +914,6 @@ diffuseColor.rgb *= detailValue;
             receiveShadow
           />
         </RigidBody>
-        <mesh
-          position={[0, elevationBands.water, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          receiveShadow={false}
-        >
-          <planeGeometry args={[size, size, 1, 1]} />
-          <meshBasicMaterial color="#36271d" transparent opacity={0.6} />
-        </mesh>
       </group>
     );
   }
