@@ -24,6 +24,8 @@ import { FlowingLinesSimple } from "./FlowingLinesSimple";
 import { useFlowingLinesControls } from "./useFlowingLinesControls";
 import { MovingShadowPlanes } from "./MovingShadowPlanes";
 import { useMovingShadowPlanesControls } from "./useMovingShadowPlanesControls";
+import { FloorDebugSpheres } from "./FloorDebugSpheres";
+import { useFloorDebugSpheresControls } from "./useFloorDebugSpheresControls";
 import * as THREE from "three";
 
 export const Map5 = ({
@@ -590,6 +592,16 @@ export const Map5 = ({
     followPlayer,
   } = useMovingShadowPlanesControls();
 
+  // Get FloorDebugSpheres controls
+  const {
+    enabled: floorDebugSpheresEnabled,
+    gridSize,
+    areaSize,
+    sphereSize,
+    sphereColor,
+    emissiveIntensity,
+  } = useFloorDebugSpheresControls();
+
   // Calculate terrain height for WindFlag position
   // WindFlag positions pole center at poleHeight/2 above group position
   // So we need to place group at terrainHeight - poleHeight/2 to get pole base at terrainHeight
@@ -849,6 +861,18 @@ export const Map5 = ({
           planeOpacity={planeOpacity}
           planeColor={planeColor}
           followPlayer={followPlayer}
+        />
+      )}
+      {/* Floor Debug Spheres - Visualize terrain height calculations */}
+      {floorDebugSpheresEnabled && heightmapLookup && (
+        <FloorDebugSpheres
+          heightmapLookup={heightmapLookup}
+          enabled={floorDebugSpheresEnabled}
+          gridSize={gridSize}
+          areaSize={areaSize}
+          sphereSize={sphereSize}
+          sphereColor={sphereColor}
+          emissiveIntensity={emissiveIntensity}
         />
       )}
     </group>

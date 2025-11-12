@@ -70,15 +70,12 @@ function getElevation({
   power,
   elevationOffset,
   iterationsOffsets,
-  mountainNoise2D,
-  fieldNoise2D,
 }) {
   let elevation = 0;
   let frequency = baseFrequency;
   let amplitude = 1;
   let normalisation = 0;
 
-  // Base terrain noise
   for (let i = 0; i < iterations; i++) {
     const offset = iterationsOffsets[i] ?? [0, 0];
     const noiseValue = noise2D(
@@ -95,48 +92,6 @@ function getElevation({
   const sign = elevation < 0 ? -1 : 1;
   elevation = Math.pow(Math.abs(elevation), power) * sign;
   elevation *= baseAmplitude;
-
-  // Add subtle elevation variation - proportional to terrain size
-  if (mountainNoise2D) {
-    let mountainElevation = 0;
-    let mfreq = baseFrequency * 0.55;
-    let mamp = baseAmplitude * 0.25; // Much smaller scale
-    for (let i = 0; i < 3; i++) {
-      // Fewer octaves for subtlety
-      const offset = iterationsOffsets[i] ?? [0, 0];
-      const noiseValue = mountainNoise2D(
-        x * mfreq + offset[0] + 1000,
-        z * mfreq + offset[1] + 1000
-      );
-      // Ridged noise: 1 - abs(noise) - smoothed to avoid sharp ridges
-      const ridged = 1.0 - Math.abs(noiseValue);
-      const ridgedPow = Math.pow(ridged, 2.0); // Smoother curve
-      mountainElevation += ridgedPow * mamp;
-      mfreq *= lacunarity * 1.4;
-      mamp *= persistence * 0.75;
-    }
-    // Only apply to higher elevations - subtle transition
-    const mountainMask = Math.max(0, elevation / (baseAmplitude * 0.55));
-    elevation += mountainElevation * Math.pow(mountainMask, 1.6) * 0.4; // Reduced strength
-  }
-
-  // Add flat fields/plateaus - enhanced for more fields
-  if (fieldNoise2D) {
-    const fieldNoise = fieldNoise2D(
-      x * baseFrequency * 0.25,
-      z * baseFrequency * 0.25
-    );
-    // Create larger field areas with smoother transitions
-    const fieldMask = Math.max(0, 1.0 - Math.abs(fieldNoise) * 1.8);
-    if (fieldMask > 0.2) {
-      // Flatten areas that should be fields - more aggressive flattening
-      const targetHeight = elevationOffset + baseAmplitude * 0.12;
-      const flattenStrength = Math.pow(fieldMask, 2.0) * 0.65;
-      elevation =
-        elevation * (1.0 - flattenStrength) + targetHeight * flattenStrength;
-    }
-  }
-
   elevation += elevationOffset;
 
   return elevation;
@@ -190,8 +145,6 @@ function createTerrainData({
   const offsetsRng = alea(`${seed}-offsets`);
   const iterationsOffsets = buildIterationsOffsets(maxIterations, offsetsRng);
   const elevationNoise2D = createNoise2D(rng);
-  const mountainNoise2D = createNoise2D(alea(`${seed}-mountains`));
-  const fieldNoise2D = createNoise2D(alea(`${seed}-fields`));
   const canyonNoise2D = createNoise2D(alea(`${seed}-canyons`));
   const useCanyons =
     canyonDepth > 0 &&
@@ -221,77 +174,32 @@ function createTerrainData({
         power,
         elevationOffset,
         iterationsOffsets,
-        mountainNoise2D,
-        fieldNoise2D,
       });
 
       let adjustedElevation = elevation;
 
-      // Add proportional hill at spawn point (0, 0, 0) - scaled to terrain size
-      const distanceFromSpawn = Math.sqrt(worldX * worldX + worldZ * worldZ);
-      const spawnHillRadius = size * 0.15; // Proportional to terrain size
-      const spawnHillHeight = baseAmplitude * 0.25; // Subtle, natural hill
-
-      if (distanceFromSpawn < spawnHillRadius) {
-        const normalizedDistance = distanceFromSpawn / spawnHillRadius;
-        // Very smooth, gentle hill curve - no sharp peaks
-        const falloff = 1.0 - normalizedDistance;
-        // Much gentler curve for smooth, rounded hill
-        const hillStrength = Math.pow(falloff, 3.5);
-        adjustedElevation += spawnHillHeight * hillStrength;
-      }
-
-      // Add subtle distant hills/mountains - proportional to terrain size
-      const distanceFromCenter = Math.sqrt(worldX * worldX + worldZ * worldZ);
-      const mountainMinDistance = size * 0.3; // Hills start further from center
-      const mountainMaxDistance = size * 0.48;
-
-      if (
-        distanceFromCenter > mountainMinDistance &&
-        distanceFromCenter < mountainMaxDistance
-      ) {
-        // Create subtle elevated areas - not dramatic mountains
-        const mountainNoise = mountainNoise2D(
-          worldX * baseFrequency * 0.4 + 5000,
-          worldZ * baseFrequency * 0.4 + 5000
+      if (useCanyons) {
+        const canyonSample = canyonNoise2D(
+          worldX * canyonFrequency,
+          worldZ * canyonFrequency
         );
-
-        // Smooth ridged noise for rounded hills - proportional scale
-        const ridged = 1.0 - Math.abs(mountainNoise);
-        const mountainMask =
-          THREE.MathUtils.smoothstep(
-            mountainMinDistance,
-            mountainMaxDistance,
-            distanceFromCenter
-          ) *
-          THREE.MathUtils.smoothstep(
-            mountainMaxDistance,
-            mountainMinDistance,
-            distanceFromCenter
+        const normalizedWidth = Math.max(canyonWidth, 1e-4);
+        const ridge =
+          1 -
+          THREE.MathUtils.clamp(Math.abs(canyonSample) / normalizedWidth, 0, 1);
+        const canyonStrength = Math.pow(
+          THREE.MathUtils.clamp(ridge, 0, 1),
+          canyonSharpness
+        );
+        if (canyonStrength > 0) {
+          const taper = THREE.MathUtils.clamp(
+            1 - Math.abs(elevation) / (baseAmplitude * 1.8),
+            0.25,
+            1
           );
-
-        // Subtle elevation - proportional to terrain size
-        const mountainHeight = baseAmplitude * 0.3 * Math.pow(ridged, 2.2);
-        adjustedElevation += mountainHeight * mountainMask * 0.5;
+          adjustedElevation -= canyonStrength * canyonDepth * taper;
+        }
       }
-
-      // Add subtle rolling hills and gentle valleys - proportional scale
-      const hillNoise = fieldNoise2D(
-        worldX * baseFrequency * 0.5 + 2000,
-        worldZ * baseFrequency * 0.5 + 2000
-      );
-      const valleyNoise = elevationNoise2D(
-        worldX * baseFrequency * 0.35 + 3000,
-        worldZ * baseFrequency * 0.35 + 3000
-      );
-
-      // Subtle rolling hills - much smaller scale
-      const hillStrength = Math.max(0, hillNoise - 0.2) * 0.4;
-      adjustedElevation += baseAmplitude * 0.08 * hillStrength;
-
-      // Gentle valleys - subtle depressions
-      const valleyStrength = Math.max(0, 0.3 - Math.abs(valleyNoise)) * 0.5;
-      adjustedElevation -= baseAmplitude * 0.06 * valleyStrength;
 
       const overflowIndex = iz * gridSize + ix;
       overflowElevations[overflowIndex] = adjustedElevation;
@@ -543,15 +451,15 @@ export const ProceduralTerrain21 = forwardRef(
       persistence = 0.48,
       maxIterations = 5,
       baseFrequency = 0.0008,
-      baseAmplitude = 95,
-      power = 1.5,
+      baseAmplitude = 85,
+      power = 1.6,
       elevationOffset = 5,
       smoothingPasses = 3,
       smoothingStrength = 0.55,
       canyonPreservation = 45,
-      canyonFrequency = 0.0003,
-      canyonWidth = 0.15,
-      canyonDepth = 0,
+      canyonFrequency = 0.0009,
+      canyonWidth = 0.32,
+      canyonDepth = 55,
       canyonSharpness = 2.1,
       playerPosition,
       sunPosition = new THREE.Vector3(-0.4, -0.6, -0.5),
@@ -560,9 +468,9 @@ export const ProceduralTerrain21 = forwardRef(
       lightnessSmoothness = 0.3,
       colorVariationScale = 0.008,
       colorVariationStrength = 0.78,
-      normalDetailScale = 0.045,
-      normalDetailIntensity = 0.25,
-      normalDetailBlend = 0.15,
+      normalDetailScale = 0.85,
+      normalDetailIntensity = 1.35,
+      normalDetailBlend = 0.05,
       onTerrainReady,
       onHeightmapReady,
       ...groupProps
@@ -1117,34 +1025,23 @@ diffuseColor.rgb = vTerrainColor;
       };
     }, [material]);
 
-    const heightmapReadyRef = useRef(false);
-    const terrainReadyRef = useRef(false);
-
-    // Reset refs when terrain data changes
     useEffect(() => {
-      heightmapReadyRef.current = false;
-      terrainReadyRef.current = false;
-    }, [terrainData]);
-
-    useEffect(() => {
-      if (onHeightmapReady && !heightmapReadyRef.current) {
-        // Call immediately since height sampler is available right away
+      if (onHeightmapReady) {
         onHeightmapReady(terrainData.heightSampler);
-        heightmapReadyRef.current = true;
       }
     }, [terrainData.heightSampler, onHeightmapReady]);
 
-    // Use useFrame to ensure mesh is fully rendered before calling onTerrainReady
-    useFrame(() => {
-      if (onTerrainReady && !terrainReadyRef.current && meshRef.current) {
-        const mesh = meshRef.current;
-        // Check if geometry is computed and mesh is in scene
-        if (mesh.geometry && mesh.geometry.attributes.position && mesh.parent) {
-          onTerrainReady(mesh);
-          terrainReadyRef.current = true;
-        }
+    useEffect(() => {
+      if (!onTerrainReady) {
+        return;
       }
-    });
+
+      const timer = setTimeout(
+        () => onTerrainReady(meshRef.current ?? null),
+        0
+      );
+      return () => clearTimeout(timer);
+    }, [onTerrainReady]);
 
     useEffect(() => {
       if (!ref) {

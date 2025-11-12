@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useLoader } from "@react-three/fiber";
 import { RigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { createNoise2D } from "simplex-noise";
@@ -70,15 +70,12 @@ function getElevation({
   power,
   elevationOffset,
   iterationsOffsets,
-  mountainNoise2D,
-  fieldNoise2D,
 }) {
   let elevation = 0;
   let frequency = baseFrequency;
   let amplitude = 1;
   let normalisation = 0;
 
-  // Base terrain noise
   for (let i = 0; i < iterations; i++) {
     const offset = iterationsOffsets[i] ?? [0, 0];
     const noiseValue = noise2D(
@@ -95,48 +92,6 @@ function getElevation({
   const sign = elevation < 0 ? -1 : 1;
   elevation = Math.pow(Math.abs(elevation), power) * sign;
   elevation *= baseAmplitude;
-
-  // Add subtle elevation variation - proportional to terrain size
-  if (mountainNoise2D) {
-    let mountainElevation = 0;
-    let mfreq = baseFrequency * 0.55;
-    let mamp = baseAmplitude * 0.25; // Much smaller scale
-    for (let i = 0; i < 3; i++) {
-      // Fewer octaves for subtlety
-      const offset = iterationsOffsets[i] ?? [0, 0];
-      const noiseValue = mountainNoise2D(
-        x * mfreq + offset[0] + 1000,
-        z * mfreq + offset[1] + 1000
-      );
-      // Ridged noise: 1 - abs(noise) - smoothed to avoid sharp ridges
-      const ridged = 1.0 - Math.abs(noiseValue);
-      const ridgedPow = Math.pow(ridged, 2.0); // Smoother curve
-      mountainElevation += ridgedPow * mamp;
-      mfreq *= lacunarity * 1.4;
-      mamp *= persistence * 0.75;
-    }
-    // Only apply to higher elevations - subtle transition
-    const mountainMask = Math.max(0, elevation / (baseAmplitude * 0.55));
-    elevation += mountainElevation * Math.pow(mountainMask, 1.6) * 0.4; // Reduced strength
-  }
-
-  // Add flat fields/plateaus - enhanced for more fields
-  if (fieldNoise2D) {
-    const fieldNoise = fieldNoise2D(
-      x * baseFrequency * 0.25,
-      z * baseFrequency * 0.25
-    );
-    // Create larger field areas with smoother transitions
-    const fieldMask = Math.max(0, 1.0 - Math.abs(fieldNoise) * 1.8);
-    if (fieldMask > 0.2) {
-      // Flatten areas that should be fields - more aggressive flattening
-      const targetHeight = elevationOffset + baseAmplitude * 0.12;
-      const flattenStrength = Math.pow(fieldMask, 2.0) * 0.65;
-      elevation =
-        elevation * (1.0 - flattenStrength) + targetHeight * flattenStrength;
-    }
-  }
-
   elevation += elevationOffset;
 
   return elevation;
@@ -157,10 +112,6 @@ function createTerrainData({
   smoothingPasses,
   smoothingStrength,
   canyonPreservation,
-  canyonFrequency,
-  canyonWidth,
-  canyonDepth,
-  canyonSharpness,
 }) {
   const precisionClamped = Math.max(0, Math.min(1, precision));
   const iterations = Math.min(
@@ -190,14 +141,6 @@ function createTerrainData({
   const offsetsRng = alea(`${seed}-offsets`);
   const iterationsOffsets = buildIterationsOffsets(maxIterations, offsetsRng);
   const elevationNoise2D = createNoise2D(rng);
-  const mountainNoise2D = createNoise2D(alea(`${seed}-mountains`));
-  const fieldNoise2D = createNoise2D(alea(`${seed}-fields`));
-  const canyonNoise2D = createNoise2D(alea(`${seed}-canyons`));
-  const useCanyons =
-    canyonDepth > 0 &&
-    canyonWidth > 0 &&
-    canyonFrequency > 0 &&
-    canyonSharpness > 0;
 
   const halfSize = size * 0.5;
   const overflowSize = gridSize * gridSize;
@@ -221,80 +164,10 @@ function createTerrainData({
         power,
         elevationOffset,
         iterationsOffsets,
-        mountainNoise2D,
-        fieldNoise2D,
       });
 
-      let adjustedElevation = elevation;
-
-      // Add proportional hill at spawn point (0, 0, 0) - scaled to terrain size
-      const distanceFromSpawn = Math.sqrt(worldX * worldX + worldZ * worldZ);
-      const spawnHillRadius = size * 0.15; // Proportional to terrain size
-      const spawnHillHeight = baseAmplitude * 0.25; // Subtle, natural hill
-
-      if (distanceFromSpawn < spawnHillRadius) {
-        const normalizedDistance = distanceFromSpawn / spawnHillRadius;
-        // Very smooth, gentle hill curve - no sharp peaks
-        const falloff = 1.0 - normalizedDistance;
-        // Much gentler curve for smooth, rounded hill
-        const hillStrength = Math.pow(falloff, 3.5);
-        adjustedElevation += spawnHillHeight * hillStrength;
-      }
-
-      // Add subtle distant hills/mountains - proportional to terrain size
-      const distanceFromCenter = Math.sqrt(worldX * worldX + worldZ * worldZ);
-      const mountainMinDistance = size * 0.3; // Hills start further from center
-      const mountainMaxDistance = size * 0.48;
-
-      if (
-        distanceFromCenter > mountainMinDistance &&
-        distanceFromCenter < mountainMaxDistance
-      ) {
-        // Create subtle elevated areas - not dramatic mountains
-        const mountainNoise = mountainNoise2D(
-          worldX * baseFrequency * 0.4 + 5000,
-          worldZ * baseFrequency * 0.4 + 5000
-        );
-
-        // Smooth ridged noise for rounded hills - proportional scale
-        const ridged = 1.0 - Math.abs(mountainNoise);
-        const mountainMask =
-          THREE.MathUtils.smoothstep(
-            mountainMinDistance,
-            mountainMaxDistance,
-            distanceFromCenter
-          ) *
-          THREE.MathUtils.smoothstep(
-            mountainMaxDistance,
-            mountainMinDistance,
-            distanceFromCenter
-          );
-
-        // Subtle elevation - proportional to terrain size
-        const mountainHeight = baseAmplitude * 0.3 * Math.pow(ridged, 2.2);
-        adjustedElevation += mountainHeight * mountainMask * 0.5;
-      }
-
-      // Add subtle rolling hills and gentle valleys - proportional scale
-      const hillNoise = fieldNoise2D(
-        worldX * baseFrequency * 0.5 + 2000,
-        worldZ * baseFrequency * 0.5 + 2000
-      );
-      const valleyNoise = elevationNoise2D(
-        worldX * baseFrequency * 0.35 + 3000,
-        worldZ * baseFrequency * 0.35 + 3000
-      );
-
-      // Subtle rolling hills - much smaller scale
-      const hillStrength = Math.max(0, hillNoise - 0.2) * 0.4;
-      adjustedElevation += baseAmplitude * 0.08 * hillStrength;
-
-      // Gentle valleys - subtle depressions
-      const valleyStrength = Math.max(0, 0.3 - Math.abs(valleyNoise)) * 0.5;
-      adjustedElevation -= baseAmplitude * 0.06 * valleyStrength;
-
       const overflowIndex = iz * gridSize + ix;
-      overflowElevations[overflowIndex] = adjustedElevation;
+      overflowElevations[overflowIndex] = elevation;
     }
   }
 
@@ -543,26 +416,17 @@ export const ProceduralTerrain21 = forwardRef(
       persistence = 0.48,
       maxIterations = 5,
       baseFrequency = 0.0008,
-      baseAmplitude = 95,
-      power = 1.5,
+      baseAmplitude = 85,
+      power = 1.6,
       elevationOffset = 5,
       smoothingPasses = 3,
       smoothingStrength = 0.55,
       canyonPreservation = 45,
-      canyonFrequency = 0.0003,
-      canyonWidth = 0.15,
-      canyonDepth = 0,
-      canyonSharpness = 2.1,
       playerPosition,
       sunPosition = new THREE.Vector3(-0.4, -0.6, -0.5),
       grassDistance = 64,
       fresnel = { offset: 0, scale: 0.4, power: 2.5 },
       lightnessSmoothness = 0.3,
-      colorVariationScale = 0.008,
-      colorVariationStrength = 0.78,
-      normalDetailScale = 0.045,
-      normalDetailIntensity = 0.25,
-      normalDetailBlend = 0.15,
       onTerrainReady,
       onHeightmapReady,
       ...groupProps
@@ -578,10 +442,6 @@ export const ProceduralTerrain21 = forwardRef(
         valley: new THREE.Color("#4a7c3e"),
         grass: new THREE.Color("#5d9e4b"),
         lightGrass: new THREE.Color("#7ab86d"),
-        grassShadow: new THREE.Color("#4b7c35"),
-        grassHighlight: new THREE.Color("#8ccf6a"),
-        grassYellow: new THREE.Color("#c9ba5b"),
-        dryGrass: new THREE.Color("#b3a45c"),
         cliff: new THREE.Color("#8b7355"),
         darkCliff: new THREE.Color("#6b5744"),
         peak: new THREE.Color("#e8e8e0"),
@@ -601,6 +461,21 @@ export const ProceduralTerrain21 = forwardRef(
       []
     );
 
+    const detailTexture = useLoader(
+      THREE.TextureLoader,
+      "/textures/Grass005_1K-JPG_Color.jpg"
+    );
+
+    useEffect(() => {
+      if (!detailTexture) {
+        return;
+      }
+      detailTexture.wrapS = THREE.RepeatWrapping;
+      detailTexture.wrapT = THREE.RepeatWrapping;
+      detailTexture.anisotropy = 8;
+      detailTexture.needsUpdate = true;
+    }, [detailTexture]);
+
     const terrainData = useMemo(
       () =>
         createTerrainData({
@@ -618,10 +493,6 @@ export const ProceduralTerrain21 = forwardRef(
           smoothingPasses,
           smoothingStrength,
           canyonPreservation,
-          canyonFrequency,
-          canyonWidth,
-          canyonDepth,
-          canyonSharpness,
         }),
       [
         size,
@@ -638,10 +509,6 @@ export const ProceduralTerrain21 = forwardRef(
         smoothingPasses,
         smoothingStrength,
         canyonPreservation,
-        canyonFrequency,
-        canyonWidth,
-        canyonDepth,
-        canyonSharpness,
       ]
     );
 
@@ -676,18 +543,6 @@ export const ProceduralTerrain21 = forwardRef(
         shader.uniforms.uColorLightGrass = {
           value: terrainPalette.lightGrass.clone(),
         };
-        shader.uniforms.uColorGrassShadow = {
-          value: terrainPalette.grassShadow.clone(),
-        };
-        shader.uniforms.uColorGrassHighlight = {
-          value: terrainPalette.grassHighlight.clone(),
-        };
-        shader.uniforms.uColorGrassYellow = {
-          value: terrainPalette.grassYellow.clone(),
-        };
-        shader.uniforms.uColorGrassDry = {
-          value: terrainPalette.dryGrass.clone(),
-        };
         shader.uniforms.uColorCliff = { value: terrainPalette.cliff.clone() };
         shader.uniforms.uColorDarkCliff = {
           value: terrainPalette.darkCliff.clone(),
@@ -699,15 +554,9 @@ export const ProceduralTerrain21 = forwardRef(
         shader.uniforms.uGrassLevel = { value: elevationBands.grass };
         shader.uniforms.uMountainLevel = { value: elevationBands.mountain };
         shader.uniforms.uPeakLevel = { value: elevationBands.peak };
-        shader.uniforms.uColorVariationScale = { value: colorVariationScale };
-        shader.uniforms.uColorVariationStrength = {
-          value: colorVariationStrength,
-        };
-        shader.uniforms.uNormalDetailScale = { value: normalDetailScale };
-        shader.uniforms.uNormalDetailIntensity = {
-          value: normalDetailIntensity,
-        };
-        shader.uniforms.uNormalDetailBlend = { value: normalDetailBlend };
+        shader.uniforms.uDetailTexture = { value: detailTexture };
+        shader.uniforms.uDetailScale = { value: 0.006 };
+        shader.uniforms.uDetailStrength = { value: 0.28 };
 
         shader.vertexShader = shader.vertexShader.replace(
           "#include <common>",
@@ -722,10 +571,6 @@ uniform vec3 uColorWater;
 uniform vec3 uColorValley;
 uniform vec3 uColorGrass;
 uniform vec3 uColorLightGrass;
-uniform vec3 uColorGrassShadow;
-uniform vec3 uColorGrassHighlight;
-uniform vec3 uColorGrassYellow;
-uniform vec3 uColorGrassDry;
 uniform vec3 uColorCliff;
 uniform vec3 uColorDarkCliff;
 uniform vec3 uColorPeak;
@@ -735,14 +580,11 @@ uniform float uValleyLevel;
 uniform float uGrassLevel;
 uniform float uMountainLevel;
 uniform float uPeakLevel;
-uniform float uColorVariationScale;
-uniform float uColorVariationStrength;
-uniform float uNormalDetailScale;
-uniform float uNormalDetailIntensity;
-uniform float uNormalDetailBlend;
+uniform sampler2D uDetailTexture;
+uniform float uDetailScale;
+uniform float uDetailStrength;
 varying vec3 vTerrainColor;
 varying vec3 vWorldPos;
-varying vec3 vWorldNormal;
 
 float hash(vec2 p) {
   p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -772,64 +614,6 @@ float fbm(vec2 p) {
   return value;
 }
 
-vec3 mod289(vec3 x) {
-  return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-vec2 mod289(vec2 x) {
-  return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-vec3 permute(vec3 x) {
-  return mod289(((x * 34.0) + 1.0) * x);
-}
-
-float snoise(vec2 v) {
-  const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
-  vec2 i = floor(v + dot(v, C.yy));
-  vec2 x0 = v - i + dot(i, C.xx);
-  vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-  vec4 x12 = x0.xyxy + C.xxzz;
-  x12.xy -= i1;
-  i = mod289(i);
-  vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-  vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
-  m *= m;
-  m *= m;
-  vec3 x = 2.0 * fract(p * C.www) - 1.0;
-  vec3 h = abs(x) - 0.5;
-  vec3 ox = floor(x + 0.5);
-  vec3 a0 = x - ox;
-  m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
-  vec3 g;
-  g.x = a0.x * x0.x + h.x * x0.y;
-  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-  return 130.0 * dot(m, g);
-}
-
-float simplexFBM(vec2 p) {
-  float value = 0.0;
-  float amplitude = 0.5;
-  float frequency = 1.0;
-  for (int i = 0; i < 5; i++) {
-    value += amplitude * snoise(p * frequency);
-    frequency *= 2.0;
-    amplitude *= 0.55;
-  }
-  return value;
-}
-
-float simplexRemap01(float v) {
-  return v * 0.5 + 0.5;
-}
-
-vec2 simplexWarp(vec2 p, float strength) {
-  float wx = simplexFBM(p * 0.5 + vec2(2.31, -3.17));
-  float wy = simplexFBM(p * 0.5 + vec2(-1.73, 1.11));
-  vec2 warp = vec2(simplexRemap01(wx), simplexRemap01(wy)) - 0.5;
-  return p + warp * strength;
-}
-
 ${inverseLerpGLSL}
 ${remapGLSL}
 ${getSunShadeGLSL}
@@ -852,21 +636,23 @@ objectNormal = bakedNormal;
 vec4 terrainData = texture2D(uTexture, uv);
 vec3 normal = normalize(terrainData.rgb);
 vec4 modelPositionCustom = modelMatrix * vec4(transformed, 1.0);
+vec4 viewPositionCustom = viewMatrix * modelPositionCustom;
 float height = modelPositionCustom.y;
 vWorldPos = modelPositionCustom.xyz;
 
+float slope = 1.0 - abs(dot(vec3(0.0, 1.0, 0.0), normal));
+
+vec3 viewDirection = normalize(modelPositionCustom.xyz - cameraPosition);
 vec3 worldNormal = normalize(
   mat3(modelMatrix[0].xyz, modelMatrix[1].xyz, modelMatrix[2].xyz) * normal
 );
-vWorldNormal = worldNormal;
-
-float slope = 1.0 - abs(dot(vec3(0.0, 1.0, 0.0), normal));
+vec3 viewNormal = normalize(normalMatrix * normal);
 
 // Multi-scale noise for natural variation
 vec2 worldXZ = modelPositionCustom.xz;
-float macroNoise = simplexRemap01(simplexFBM(worldXZ * 0.00045));
-float mesoNoise = simplexRemap01(simplexFBM(worldXZ * 0.0024));
-float microNoise = simplexRemap01(snoise(worldXZ * 0.018));
+float macroNoise = fbm(worldXZ * 0.0003);
+float mesoNoise = fbm(worldXZ * 0.002);
+float microNoise = noise(worldXZ * 0.015);
 
 // Blend colors based on height with improved transitions
 vec3 color = uColorWater;
@@ -875,60 +661,8 @@ float tValley = smoothstep(uWaterLevel - 5.0, uValleyLevel + 8.0, height);
 color = mix(color, uColorValley, tValley);
 
 float tGrass = smoothstep(uValleyLevel - 3.0, uGrassLevel + 12.0, height);
-float valleyVariationNoise = simplexRemap01(simplexFBM(worldXZ * (uColorVariationScale * 2.6) + vec2(17.21, -9.13)));
-float valleyMicroNoise = simplexRemap01(snoise(worldXZ * (uColorVariationScale * 44.0) + vec2(-5.3, 2.4)));
-float valleyVariation = clamp(
-  (valleyVariationNoise - 0.5) * 1.08 +
-  (valleyMicroNoise - 0.5) * 0.7 +
-  (mesoNoise - 0.5) * 0.65,
-  -1.0,
-  1.0
-);
-vec3 valleyShade = mix(uColorValley * 0.74, uColorValley * 1.24, valleyVariation * 0.5 + 0.5);
-color = mix(color, clamp(valleyShade, 0.0, 1.0), clamp(tValley * uColorVariationStrength * 0.68, 0.0, 1.0));
-
-vec3 lushGrass = mix(uColorGrass, uColorLightGrass, microNoise * 0.55 + 0.3);
-
-vec2 grassPatchUVBase = worldXZ * uColorVariationScale;
-vec2 grassPatchUV = simplexWarp(grassPatchUVBase, 0.24);
-grassPatchUV = simplexWarp(grassPatchUV, 0.12);
-
-float grassMacro = simplexRemap01(simplexFBM(grassPatchUV * 4.6 + vec2(23.17, 11.91) + macroNoise * 1.6));
-float grassDetail = simplexRemap01(simplexFBM(grassPatchUV * 19.0 + vec2(-9.31, 4.77)));
-float grassMicro = simplexRemap01(snoise(grassPatchUV * 58.0 + vec2(6.2, -3.9)));
-float grassRidged = simplexRemap01(snoise(grassPatchUV * 36.0 + vec2(-21.4, 15.8)));
-
-float patchLerp = clamp(grassMacro * 0.34 + grassDetail * 0.42 + grassMicro * 0.24, 0.0, 1.0);
-float highlightMask = smoothstep(0.32, 0.68, patchLerp) * smoothstep(0.28, 0.75, grassRidged);
-float yellowMask = smoothstep(0.58, 0.88, grassDetail) * smoothstep(0.42, 0.9, grassMacro);
-float shadowMask = smoothstep(0.08, 0.4, patchLerp) * (1.0 - highlightMask * 0.75);
-
-vec3 basePatch = mix(uColorGrassShadow, uColorGrassHighlight, patchLerp);
-basePatch = mix(basePatch, uColorGrassYellow, yellowMask * 0.6);
-
-vec3 microTint = mix(uColorGrassShadow, uColorGrassHighlight * 1.1, grassMicro);
-basePatch = mix(basePatch, microTint, 0.46);
-
-vec3 highlightTint = mix(lushGrass, uColorGrassHighlight * 1.12, highlightMask);
-vec3 yellowTint = mix(highlightTint, uColorGrassYellow * 1.08, yellowMask * 0.72);
-vec3 shadowTint = mix(yellowTint, uColorGrassShadow * 0.8, shadowMask);
-
-vec3 grassVariation = mix(lushGrass, shadowTint, clamp(uColorVariationStrength * 0.85, 0.0, 1.0));
-grassVariation = mix(grassVariation, basePatch, clamp(uColorVariationStrength * 0.7, 0.0, 1.0));
-
-float drynessNoise = simplexRemap01(simplexFBM(simplexWarp(grassPatchUVBase, 0.18) * 9.2 + vec2(12.6, -8.1)));
-float grassDryness = clamp(drynessNoise, 0.0, 1.0);
-grassDryness = pow(grassDryness, 1.42);
-grassDryness *= mix(0.36, 1.0, smoothstep(0.06, 0.82, slope));
-vec3 grassColor = mix(grassVariation, uColorGrassDry, clamp(grassDryness * uColorVariationStrength, 0.0, 1.0));
-
-float speckle = simplexRemap01(snoise(worldXZ * 120.0 + vec2(-31.2, 48.9)));
-float speckle2 = simplexRemap01(simplexFBM(worldXZ * 68.0 + vec2(4.4, -19.7)));
-float speckleMix = clamp(0.35 + speckle2 * 0.65, 0.0, 1.0);
-vec3 speckleTint = mix(grassColor * (0.82 + speckle * 0.22), grassColor * (0.95 + speckle * 0.14), speckleMix);
-grassColor = mix(grassColor, speckleTint, 0.58);
-
-color = mix(color, clamp(grassColor, 0.0, 1.0), tGrass);
+vec3 grassColor = mix(uColorGrass, uColorLightGrass, microNoise * 0.6 + 0.2);
+color = mix(color, grassColor, tGrass);
 
 // Cliff coloring based on slope with variation
 float cliffInfluence = smoothstep(0.4, 0.85, slope);
@@ -970,117 +704,9 @@ vTerrainColor = clamp(color, 0.0, 1.0);
           `#include <common>
 varying vec3 vTerrainColor;
 varying vec3 vWorldPos;
-varying vec3 vWorldNormal;
-uniform float uNormalDetailScale;
-uniform float uNormalDetailIntensity;
-uniform float uNormalDetailBlend;
-
-float hash(vec2 p) {
-  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-  return fract(sin(p.x + p.y) * 43758.5453);
-}
-
-float noise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  float a = hash(i);
-  float b = hash(i + vec2(1.0, 0.0));
-  float c = hash(i + vec2(0.0, 1.0));
-  float d = hash(i + vec2(1.0, 1.0));
-  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
-float fbm(vec2 p) {
-  float value = 0.0;
-  float amplitude = 0.5;
-  float frequency = 1.0;
-  for(int i = 0; i < 4; i++) {
-    value += amplitude * noise(p * frequency);
-    frequency *= 2.0;
-    amplitude *= 0.5;
-  }
-  return value;
-}
-
-vec3 mod289(vec3 x) {
-  return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-vec2 mod289(vec2 x) {
-  return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-vec3 permute(vec3 x) {
-  return mod289(((x * 34.0) + 1.0) * x);
-}
-
-float snoise(vec2 v) {
-  const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
-  vec2 i = floor(v + dot(v, C.yy));
-  vec2 x0 = v - i + dot(i, C.xx);
-  vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-  vec4 x12 = x0.xyxy + C.xxzz;
-  x12.xy -= i1;
-  i = mod289(i);
-  vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-  vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
-  m *= m;
-  m *= m;
-  vec3 x = 2.0 * fract(p * C.www) - 1.0;
-  vec3 h = abs(x) - 0.5;
-  vec3 ox = floor(x + 0.5);
-  vec3 a0 = x - ox;
-  m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
-  vec3 g;
-  g.x = a0.x * x0.x + h.x * x0.y;
-  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-  return 130.0 * dot(m, g);
-}
-
-float simplexFBM(vec2 p) {
-  float value = 0.0;
-  float amplitude = 0.5;
-  float frequency = 1.0;
-  for (int i = 0; i < 5; i++) {
-    value += amplitude * snoise(p * frequency);
-    frequency *= 2.0;
-    amplitude *= 0.55;
-  }
-  return value;
-}
-
-float simplexRemap01(float v) {
-  return v * 0.5 + 0.5;
-}
-
-vec2 simplexWarp(vec2 p, float strength) {
-  float wx = simplexFBM(p * 0.5 + vec2(2.31, -3.17));
-  float wy = simplexFBM(p * 0.5 + vec2(-1.73, 1.11));
-  vec2 warp = vec2(simplexRemap01(wx), simplexRemap01(wy)) - 0.5;
-  return p + warp * strength;
-}
-`
-        );
-
-        shader.fragmentShader = shader.fragmentShader.replace(
-          "#include <normal_fragment_maps>",
-          `#include <normal_fragment_maps>
-vec3 baseNormalVS = normalize(normal);
-vec3 worldNormal = normalize(vWorldNormal);
-vec2 detailUV = vWorldPos.xz * uNormalDetailScale;
-float eps = 0.00065;
-float noisePx = simplexFBM(detailUV + vec2(eps, 0.0));
-float noiseNx = simplexFBM(detailUV - vec2(eps, 0.0));
-float noisePz = simplexFBM(detailUV + vec2(0.0, eps));
-float noiseNz = simplexFBM(detailUV - vec2(0.0, eps));
-float dNoiseDx = (noisePx - noiseNx) / (2.0 * eps);
-float dNoiseDz = (noisePz - noiseNz) / (2.0 * eps);
-vec3 detailWorldNormal = normalize(vec3(-dNoiseDx * uNormalDetailIntensity, 1.0, -dNoiseDz * uNormalDetailIntensity));
-float normalBlend = clamp(uNormalDetailBlend, 0.0, 1.0);
-worldNormal = normalize(mix(worldNormal, detailWorldNormal, normalBlend));
-vec3 detailNormalVS = normalize((viewMatrix * vec4(worldNormal, 0.0)).xyz);
-normal = normalize(mix(baseNormalVS, detailNormalVS, normalBlend));
+uniform sampler2D uDetailTexture;
+uniform float uDetailScale;
+uniform float uDetailStrength;
 `
         );
 
@@ -1088,6 +714,19 @@ normal = normalize(mix(baseNormalVS, detailNormalVS, normalBlend));
           "#include <color_fragment>",
           `#include <color_fragment>
 diffuseColor.rgb = vTerrainColor;
+
+// Detail texture with distance fade
+vec2 detailUV = vWorldPos.xz * uDetailScale;
+vec3 detailSample = texture2D(uDetailTexture, detailUV).rgb;
+float detailValue = (detailSample.r + detailSample.g + detailSample.b) / 3.0;
+
+// Fade detail texture with distance
+float distanceToCamera = length(vWorldPos - cameraPosition);
+float detailFade = smoothstep(200.0, 50.0, distanceToCamera);
+float adjustedStrength = uDetailStrength * detailFade;
+
+detailValue = mix(1.0, detailValue, adjustedStrength);
+diffuseColor.rgb *= detailValue;
 `
         );
 
@@ -1103,11 +742,7 @@ diffuseColor.rgb = vTerrainColor;
       fresnel,
       terrainPalette,
       elevationBands,
-      colorVariationScale,
-      colorVariationStrength,
-      normalDetailScale,
-      normalDetailIntensity,
-      normalDetailBlend,
+      detailTexture,
     ]);
 
     useEffect(() => {
@@ -1117,34 +752,23 @@ diffuseColor.rgb = vTerrainColor;
       };
     }, [material]);
 
-    const heightmapReadyRef = useRef(false);
-    const terrainReadyRef = useRef(false);
-
-    // Reset refs when terrain data changes
     useEffect(() => {
-      heightmapReadyRef.current = false;
-      terrainReadyRef.current = false;
-    }, [terrainData]);
-
-    useEffect(() => {
-      if (onHeightmapReady && !heightmapReadyRef.current) {
-        // Call immediately since height sampler is available right away
+      if (onHeightmapReady) {
         onHeightmapReady(terrainData.heightSampler);
-        heightmapReadyRef.current = true;
       }
     }, [terrainData.heightSampler, onHeightmapReady]);
 
-    // Use useFrame to ensure mesh is fully rendered before calling onTerrainReady
-    useFrame(() => {
-      if (onTerrainReady && !terrainReadyRef.current && meshRef.current) {
-        const mesh = meshRef.current;
-        // Check if geometry is computed and mesh is in scene
-        if (mesh.geometry && mesh.geometry.attributes.position && mesh.parent) {
-          onTerrainReady(mesh);
-          terrainReadyRef.current = true;
-        }
+    useEffect(() => {
+      if (!onTerrainReady) {
+        return;
       }
-    });
+
+      const timer = setTimeout(
+        () => onTerrainReady(meshRef.current ?? null),
+        0
+      );
+      return () => clearTimeout(timer);
+    }, [onTerrainReady]);
 
     useEffect(() => {
       if (!ref) {
@@ -1193,20 +817,8 @@ diffuseColor.rgb = vTerrainColor;
       if (uniforms.uTexture) {
         uniforms.uTexture.value = terrainData.texture;
       }
-      if (uniforms.uColorVariationScale) {
-        uniforms.uColorVariationScale.value = colorVariationScale;
-      }
-      if (uniforms.uColorVariationStrength) {
-        uniforms.uColorVariationStrength.value = colorVariationStrength;
-      }
-      if (uniforms.uNormalDetailScale) {
-        uniforms.uNormalDetailScale.value = normalDetailScale;
-      }
-      if (uniforms.uNormalDetailIntensity) {
-        uniforms.uNormalDetailIntensity.value = normalDetailIntensity;
-      }
-      if (uniforms.uNormalDetailBlend) {
-        uniforms.uNormalDetailBlend.value = normalDetailBlend;
+      if (uniforms.uDetailTexture) {
+        uniforms.uDetailTexture.value = detailTexture;
       }
       shader.uniformsNeedUpdate = true;
     });

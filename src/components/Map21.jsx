@@ -1,6 +1,6 @@
 import { useMemo, forwardRef } from "react";
 import * as THREE from "three";
-import { ProceduralTerrain21 } from "./ProceduralTerrain21";
+import { ProceduralTerrain21 } from "./ProceduralTerrain23";
 
 export const Map21 = forwardRef(
   (
@@ -46,4 +46,3 @@ export const Map21 = forwardRef(
 );
 
 Map21.displayName = "Map21";
-

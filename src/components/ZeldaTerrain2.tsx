@@ -215,7 +215,7 @@ const ZeldaTerrain2: React.FC<{
     centerRegionSize,
   } = useControls("🗻 Zelda Terrain 2", {
     worldSize: {
-      value: 2000,
+      value: 4000,
       min: 500,
       max: 5000,
       step: 100,
@@ -493,8 +493,8 @@ const ZeldaTerrain2: React.FC<{
       color: enableHeightGradient
         ? "#ffffff"
         : useHeightmapAsTexture
-        ? "#ffffff"
-        : terrainColor,
+          ? "#ffffff"
+          : terrainColor,
       roughness: roughness,
       metalness: metalness,
       wireframe: showWireframe,
