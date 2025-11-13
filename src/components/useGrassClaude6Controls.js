@@ -313,6 +313,10 @@ export function useGrassClaude6Controls() {
               step: 0.1,
               label: "AO Intensity",
             },
+            debugLOD: {
+              value: false,
+              label: "🐛 Debug LOD (Green=High, Red=Low)",
+            },
           },
           { collapsed: true }
         ),

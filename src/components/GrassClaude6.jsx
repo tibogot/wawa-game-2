@@ -13,12 +13,16 @@ import * as THREE from "three";
 
 const SHADER_COMMON = `
 // Constants
+#ifndef PI
 #define PI 3.14159265359
+#endif
 
 // Utility functions from common.glsl
-float saturate(float x) {
-  return clamp(x, 0.0, 1.0);
-}
+// Note: saturate is NOT defined here - Three.js r180 may provide it in <common>
+// If you get "saturate is not defined" errors, uncomment the function below
+// float saturate(float x) {
+//   return clamp(x, 0.0, 1.0);
+// }
 
 vec2 saturate2(vec2 x) {
   return clamp(x, vec2(0.0), vec2(1.0));
@@ -232,6 +236,10 @@ varying vec3 vViewPosition;
 #include <logdepthbuf_pars_vertex>
 #include <clipping_planes_pars_vertex>
 
+// OPTIMIZED: Include shared utility functions (no duplicates) - after Three.js includes
+${SHADER_COMMON}
+${SHADER_NOISE}
+
 varying vec3 vWorldNormal;
 varying vec3 vGrassColour;
 varying vec4 vGrassParams;
@@ -247,6 +255,7 @@ uniform sampler2D heightmap;
 uniform vec4 heightParams;
 uniform vec3 playerPos;
 uniform mat4 viewMatrixInverse;
+uniform vec3 uCameraPosition; // Explicit camera position for accurate LOD calculation
 
 // Grass color uniforms
 uniform vec3 uBaseColor1;
@@ -271,74 +280,6 @@ uniform float uPlayerInteractionStrength;
 
 attribute float vertIndex;
 
-// Utility functions
-float remap(float value, float low1, float high1, float low2, float high2) {
-  return low2 + (value - low1) * (high2 - low2) / (high1 - low1);
-}
-
-float linearstep(float edge0, float edge1, float x) {
-  return clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
-}
-
-float easeIn(float t, float p) {
-  return pow(t, p);
-}
-
-float easeOut(float t, float p) {
-  return 1.0 - pow(1.0 - t, p);
-}
-
-vec4 hash42(vec2 p) {
-  vec4 p4 = fract(vec4(p.xyxy) * vec4(443.897, 441.423, 437.195, 429.123));
-  p4 += dot(p4, p4.wzxy + 19.19);
-  return fract((p4.xxyz + p4.yzzw) * p4.zywx);
-}
-
-vec2 hash22(vec2 p) {
-  vec3 p3 = fract(vec3(p.xyx) * vec3(443.897, 441.423, 437.195));
-  p3 += dot(p3, p3.yzx + 19.19);
-  return fract((p3.xx + p3.yz) * p3.zy);
-}
-
-float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float noise12(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  float a = hash(i);
-  float b = hash(i + vec2(1.0, 0.0));
-  float c = hash(i + vec2(0.0, 1.0));
-  float d = hash(i + vec2(1.0, 1.0));
-  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
-mat3 rotateY(float angle) {
-  float c = cos(angle);
-  float s = sin(angle);
-  return mat3(c, 0.0, s, 0.0, 1.0, 0.0, -s, 0.0, c);
-}
-
-mat3 rotateX(float angle) {
-  float c = cos(angle);
-  float s = sin(angle);
-  return mat3(1.0, 0.0, 0.0, 0.0, c, -s, 0.0, s, c);
-}
-
-mat3 rotateAxis(vec3 axis, float angle) {
-  axis = normalize(axis);
-  float s = sin(angle);
-  float c = cos(angle);
-  float oc = 1.0 - c;
-  return mat3(
-    oc * axis.x * axis.x + c, oc * axis.x * axis.y - axis.z * s, oc * axis.z * axis.x + axis.y * s,
-    oc * axis.x * axis.y + axis.z * s, oc * axis.y * axis.y + c, oc * axis.y * axis.z - axis.x * s,
-    oc * axis.z * axis.x - axis.y * s, oc * axis.y * axis.z + axis.x * s, oc * axis.z * axis.z + c
-  );
-}
-
 void main() {
   #include <uv_vertex>
   #include <color_vertex>
@@ -361,9 +302,12 @@ void main() {
 
   vec4 hashVal1 = hash42(vec2(grassBladeWorldPos.x, grassBladeWorldPos.z));
 
-  float highLODOut = smoothstep(grassDraw.x * 0.5, grassDraw.x, distance(cameraPosition, grassBladeWorldPos));
+  // FIXED: Hard cutoff for LOD - close grass is always high LOD (curved), far grass is low LOD (linear)
+  // Use explicit camera position uniform for accurate, always-updated LOD calculation
+  // step returns 0.0 if distance < lodDistance (high LOD), 1.0 if distance >= lodDistance (low LOD)
+  float highLODOut = step(grassDraw.x, distance(uCameraPosition, grassBladeWorldPos));
   // Disable distance-based culling - always show grass regardless of distance
-  float lodFadeIn = 0.0; // smoothstep(grassDraw.x, grassDraw.y, distance(cameraPosition, grassBladeWorldPos));
+  float lodFadeIn = 0.0; // smoothstep(grassDraw.x, grassDraw.y, distance(uCameraPosition, grassBladeWorldPos));
 
   // Check terrain type
   float isSandy = linearstep(-11.0, -14.0, grassBladeWorldPos.y);
@@ -487,7 +431,7 @@ void main() {
   transformed.y += grassBladeWorldPos.y;
 
   vec3 cameraWorldLeft = (viewMatrixInverse * vec4(-1.0, 0.0, 0.0, 0.0)).xyz;
-  vec3 viewDir = normalize(cameraPosition - grassBladeWorldPos);
+  vec3 viewDir = normalize(uCameraPosition - grassBladeWorldPos);
   vec3 viewDirXZ = normalize(vec3(viewDir.x, 0.0, viewDir.z));
   vec3 grassFaceNormalXZ = normalize(vec3(grassFaceNormal.x, 0.0, grassFaceNormal.z));
 
@@ -574,6 +518,10 @@ uniform float opacity;
 #include <logdepthbuf_pars_fragment>
 #include <clipping_planes_pars_fragment>
 
+// OPTIMIZED: Include shared utility functions (no duplicates) - after Three.js includes
+${SHADER_COMMON}
+${SHADER_OKLAB}
+
 varying vec3 vGrassColour;
 varying vec4 vGrassParams;
 varying vec3 vNormal2;
@@ -612,52 +560,8 @@ uniform float uNormalMixFactor;
 uniform bool uAoEnabled;
 uniform float uAoIntensity;
 
-// OKLAB color space conversion - GLSL 1.0 compatible
-mat3 kLMStoCONE = mat3(
-  4.0767245293, -1.2681437731, -0.0041119885,
-  -3.3072168827, 2.6093323231, -0.7034763098,
-  0.2307590544, -0.3411344290, 1.7068625689
-);
-
-mat3 kCONEtoLMS = mat3(
-  0.4121656120, 0.2118591070, 0.0883097947,
-  0.5362752080, 0.6807189584, 0.2818474174,
-  0.0514575653, 0.1074065790, 0.6302613616
-);
-
-vec3 rgbToOklab(vec3 c) {
-  vec3 lms = kCONEtoLMS * c;
-  return sign(lms) * pow(abs(lms), vec3(0.3333333333333));
-}
-
-vec3 oklabToRGB(vec3 c) {
-  // OKLAB to LMS: cube the OKLAB values (reverse of cube root)
-  vec3 lms = c * c * c;
-  // LMS to RGB: use conversion matrix
-  return kLMStoCONE * lms;
-}
-
-// col3 wrapper for color space
-vec3 col3(vec3 v) {
-  return rgbToOklab(v);
-}
-
-vec3 col3(float r, float g, float b) {
-  return rgbToOklab(vec3(r, g, b));
-}
-
-vec3 col3(float v) {
-  return rgbToOklab(vec3(v));
-}
-
-// Utility functions for advanced parameters
-float linearstep(float edge0, float edge1, float x) {
-  return clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
-}
-
-float easeIn(float t, float p) {
-  return pow(t, p);
-}
+// Debug uniforms
+uniform bool uDebugLOD; // Enable LOD visualization (green = high LOD, red = low LOD)
 
 void main() {
   #include <clipping_planes_fragment>
@@ -667,8 +571,22 @@ void main() {
   // Grass parameters from vertex shader
   float heightPercent = vGrassParams.x;
   float height = vGrassParams.y;
-  float lodFadeIn = vGrassParams.z;
+  float highLODOut = vGrassParams.z; // 0.0 = high LOD (curved), 1.0 = low LOD (linear)
+  float lodFadeIn = highLODOut; // Keep for compatibility
   float lodFadeOut = 1.0 - lodFadeIn;
+  
+  // DEBUG: Color blades based on LOD level
+  if (uDebugLOD) {
+    // High LOD (highLODOut = 0.0): Bright green
+    // Low LOD (highLODOut = 1.0): Bright red
+    // Transition: Yellow
+    vec3 debugColor = mix(
+      vec3(0.0, 1.0, 0.0),  // Green for high LOD (curved)
+      vec3(1.0, 0.0, 0.0),  // Red for low LOD (linear)
+      highLODOut
+    );
+    diffuseColor.rgb = debugColor;
+  }
   
   // Grass middle calculation - creates more variation in blade appearance
   float grassMiddle = mix(
@@ -921,6 +839,7 @@ export function GrassPatch({
   normalMixFactor = 0.5,
   aoEnabled = true, // Advanced controls
   aoIntensity = 1.0,
+  debugLOD = false, // Debug: Color blades by LOD (green = high, red = low)
   windEnabled = true, // Wind controls
   windStrength = 1.25,
   windDirectionScale = 0.05,
@@ -976,6 +895,7 @@ export function GrassPatch({
     lightDirectionZ: lightDirectionZ,
     aoEnabled: aoEnabled,
     aoIntensity: aoIntensity,
+    debugLOD: debugLOD,
   });
 
   // Create geometry once
@@ -1038,6 +958,7 @@ export function GrassPatch({
       };
       shader.uniforms.playerPos = { value: new THREE.Vector3(0, 0, 0) };
       shader.uniforms.viewMatrixInverse = { value: new THREE.Matrix4() };
+      shader.uniforms.uCameraPosition = { value: new THREE.Vector3(0, 0, 0) };
       shader.uniforms.grassTexture = { value: null };
       shader.uniforms.grassLODColour = { value: new THREE.Vector3(0, 0, 1) };
 
@@ -1107,6 +1028,9 @@ export function GrassPatch({
       shader.uniforms.uAoEnabled = { value: aoEnabled };
       shader.uniforms.uAoIntensity = { value: aoIntensity };
 
+      // Debug uniforms
+      shader.uniforms.uDebugLOD = { value: false };
+
       // Replace shaders with complete versions
       shader.vertexShader = grassVertexShader;
       shader.fragmentShader = grassFragmentShader;
@@ -1157,6 +1081,7 @@ export function GrassPatch({
     lightDirectionZ,
     aoEnabled,
     aoIntensity,
+    debugLOD,
     windEnabled,
     windStrength,
     windDirectionScale,
@@ -1209,6 +1134,8 @@ export function GrassPatch({
     // Always update time and camera-dependent uniforms (they change every frame)
     shader.uniforms.time.value = state.clock.elapsedTime;
     shader.uniforms.viewMatrixInverse.value.copy(state.camera.matrixWorld);
+    // Update camera position for accurate LOD calculation - always update to ensure it's current
+    shader.uniforms.uCameraPosition.value.copy(state.camera.position);
 
     // Player position - only update if provided and changed
     if (playerPosition) {
@@ -1374,6 +1301,9 @@ export function GrassPatch({
       shader.uniforms.uAoIntensity.value = aoIntensity;
       prev.aoIntensity = aoIntensity;
     }
+
+    // Debug LOD - always update (can be toggled frequently)
+    shader.uniforms.uDebugLOD.value = debugLOD;
   });
 
   // Use external ref if provided, otherwise use internal ref
