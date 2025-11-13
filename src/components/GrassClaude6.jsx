@@ -562,9 +562,14 @@ uniform float uAoIntensity;
 
 // Debug uniforms
 uniform bool uDebugLOD; // Enable LOD visualization (green = high LOD, red = low LOD)
+uniform bool uDebugNormals; // Enable normal visualization (RGB = normal direction)
 
 void main() {
   #include <clipping_planes_fragment>
+  
+  // Store debug normal color for later use (calculated early to skip color processing)
+  vec3 debugNormalColor = vec3(0.0);
+  bool isDebugNormals = uDebugNormals;
   
   vec4 diffuseColor = vec4(vGrassColour, 1.0);
   
@@ -624,10 +629,32 @@ void main() {
   
   // Mix normals for more 3D appearance - using normal (from Three.js) and vNormal2 (custom)
   // normal is already provided by Three.js after normal_fragment_maps
+  // IMPORTANT: Use vGrassParams.w (xSide) by default to create per-side normal variation
+  // This makes each side of the blade have a different normal, creating the 3D effect
   vec3 baseNormal = normalize(normal);
   vec3 normal2 = normalize(vNormal2);
+  // xSide alternates between 0.0 and 1.0 for left/right vertices, creating the 3D look
   float mixFactor = uNormalMixEnabled ? uNormalMixFactor : vGrassParams.w;
+  // When uNormalMixEnabled is false, use xSide (like GrassClaude2) for per-side variation
+  // When enabled, uNormalMixFactor can override (0.5 = uniform blend, but loses 3D effect)
   normal = normalize(mix(baseNormal, normal2, mixFactor));
+  
+  // Calculate debug normal color if enabled
+  if (isDebugNormals) {
+    vec3 n = normal;
+    
+    // Map X and Z components directly to Red and Blue (these show the variation)
+    // Suppress Y (green) since it's always high and not informative
+    debugNormalColor.r = n.x * 0.5 + 0.5; // Red = X component (left/right)
+    debugNormalColor.b = n.z * 0.5 + 0.5; // Blue = Z component (forward/back)
+    debugNormalColor.g = 0.1; // Minimal green (Y is always up, not informative)
+    
+    // Dramatically enhance X and Z contrast to make variation visible
+    debugNormalColor.r = (debugNormalColor.r - 0.5) * 5.0 + 0.5; // Much more contrast for X
+    debugNormalColor.b = (debugNormalColor.b - 0.5) * 5.0 + 0.5; // Much more contrast for Z
+    
+    debugNormalColor = clamp(debugNormalColor, 0.0, 1.0);
+  }
   
   #include <emissivemap_fragment>
   
@@ -712,6 +739,11 @@ void main() {
     
     // Convert back to RGB
     outgoingLight = oklabToRGB(foggedOklab);
+  }
+  
+  // DEBUG: Replace outgoingLight with pure normal colors (after all processing)
+  if (isDebugNormals) {
+    outgoingLight = debugNormalColor;
   }
   
   #include <opaque_fragment>
@@ -835,11 +867,12 @@ export function GrassPatch({
   lightDirectionX = 1.0,
   lightDirectionY = 1.0,
   lightDirectionZ = 0.5,
-  normalMixEnabled = true, // Normal mixing controls
+  normalMixEnabled = false, // Normal mixing controls (false = use xSide for per-side variation like GrassClaude2)
   normalMixFactor = 0.5,
   aoEnabled = true, // Advanced controls
   aoIntensity = 1.0,
   debugLOD = false, // Debug: Color blades by LOD (green = high, red = low)
+  debugNormals = false, // Debug: Visualize normals as RGB colors
   windEnabled = true, // Wind controls
   windStrength = 1.25,
   windDirectionScale = 0.05,
@@ -896,6 +929,7 @@ export function GrassPatch({
     aoEnabled: aoEnabled,
     aoIntensity: aoIntensity,
     debugLOD: debugLOD,
+    debugNormals: debugNormals,
   });
 
   // Create geometry once
@@ -1030,6 +1064,7 @@ export function GrassPatch({
 
       // Debug uniforms
       shader.uniforms.uDebugLOD = { value: false };
+      shader.uniforms.uDebugNormals = { value: false };
 
       // Replace shaders with complete versions
       shader.vertexShader = grassVertexShader;
@@ -1082,6 +1117,7 @@ export function GrassPatch({
     aoEnabled,
     aoIntensity,
     debugLOD,
+    debugNormals,
     windEnabled,
     windStrength,
     windDirectionScale,
@@ -1304,6 +1340,9 @@ export function GrassPatch({
 
     // Debug LOD - always update (can be toggled frequently)
     shader.uniforms.uDebugLOD.value = debugLOD;
+
+    // Debug Normals - always update (can be toggled frequently)
+    shader.uniforms.uDebugNormals.value = debugNormals;
   });
 
   // Use external ref if provided, otherwise use internal ref

@@ -263,6 +263,7 @@ export const Map1 = ({
     aoEnabled: aoEnabled6,
     aoIntensity: aoIntensity6,
     debugLOD: debugLOD6,
+    debugNormals: debugNormals6,
     fogEnabled: fogEnabled6,
     fogNear: fogNear6,
     fogFar: fogFar6,
@@ -1670,6 +1671,7 @@ export const Map1 = ({
           aoEnabled={aoEnabled6}
           aoIntensity={aoIntensity6}
           debugLOD={debugLOD6}
+          debugNormals={debugNormals6}
           fogEnabled={fogEnabled6}
           fogNear={fogNear6}
           fogFar={fogFar6}

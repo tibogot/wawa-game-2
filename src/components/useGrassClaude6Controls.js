@@ -157,8 +157,8 @@ export function useGrassClaude6Controls() {
         normalMixing: folder(
           {
             normalMixEnabled: {
-              value: true,
-              label: "Enable Normal Mixing",
+              value: false,
+              label: "Enable Normal Mixing (false = per-side variation like GrassClaude2)",
             },
             normalMixFactor: {
               value: 0.5,
@@ -316,6 +316,10 @@ export function useGrassClaude6Controls() {
             debugLOD: {
               value: false,
               label: "🐛 Debug LOD (Green=High, Red=Low)",
+            },
+            debugNormals: {
+              value: false,
+              label: "🎨 Debug Normals (RGB=Normal Direction)",
             },
           },
           { collapsed: true }
