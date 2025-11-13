@@ -1,6 +1,6 @@
 import { useMemo, forwardRef, useState, useCallback } from "react";
 import * as THREE from "three";
-import { ProceduralTerrain21 } from "./ProceduralTerrain24";
+import { ProceduralTerrain21 } from "./ProceduralTerrain23";
 import { GrassField as GrassField5 } from "./GrassClaude5";
 import { useGrassClaude5Controls } from "./useGrassClaude5Controls";
 import { HeightFog } from "./HeightFog";
