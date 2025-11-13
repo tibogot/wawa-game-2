@@ -8,6 +8,7 @@ import { SimonDevGrass23 } from "./SimonDevGrass23/SimonDevGrass23";
 import { GrassField } from "./GrassClaude2";
 import { GrassField as GrassField3 } from "./GrassClaude3";
 import { GrassField as GrassField4 } from "./GrassClaude4";
+import { GrassField as GrassField6 } from "./GrassClaude6";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
@@ -17,6 +18,7 @@ import { useSimonDevGrass23Controls } from "./useSimonDevGrass23Controls";
 import { useGrassClaudeControls } from "./useGrassClaudeControls";
 import { useGrassClaude3Controls } from "./useGrassClaude3Controls";
 import { useGrassClaude4Controls } from "./useGrassClaude4Controls";
+import { useGrassClaude6Controls } from "./useGrassClaude6Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
@@ -214,6 +216,58 @@ export const Map1 = ({
     fogColor,
     fogIntensity,
   } = useGrassClaude4Controls();
+
+  // Get GrassClaude6 controls
+  const {
+    grassClaude6Enabled,
+    grassHeight: grassHeight6,
+    gridSize: gridSize6,
+    patchSpacing: patchSpacing6,
+    segments: segments6,
+    numGrass: numGrass6,
+    patchSize: patchSize6,
+    grassWidth: grassWidth6,
+    lodDistance: lodDistance6,
+    maxDistance: maxDistance6,
+    baseColor1: baseColor1_6,
+    baseColor2: baseColor2_6,
+    tipColor1: tipColor1_6,
+    tipColor2: tipColor2_6,
+    gradientBlend: gradientBlend6,
+    gradientCurve: gradientCurve6,
+    backscatterEnabled: backscatterEnabled6,
+    backscatterIntensity: backscatterIntensity6,
+    backscatterColor: backscatterColor6,
+    backscatterPower: backscatterPower6,
+    frontScatterStrength: frontScatterStrength6,
+    rimSSSStrength: rimSSSStrength6,
+    specularEnabled: specularEnabled6,
+    specularIntensity: specularIntensity6,
+    specularColor: specularColor6,
+    specularPower: specularPower6,
+    specularScale: specularScale6,
+    lightDirectionX: lightDirectionX6,
+    lightDirectionY: lightDirectionY6,
+    lightDirectionZ: lightDirectionZ6,
+    windEnabled: windEnabled6,
+    windStrength: windStrength6,
+    windDirectionScale: windDirectionScale6,
+    windDirectionSpeed: windDirectionSpeed6,
+    windStrengthScale: windStrengthScale6,
+    windStrengthSpeed: windStrengthSpeed6,
+    playerInteractionEnabled: playerInteractionEnabled6,
+    playerInteractionRange: playerInteractionRange6,
+    playerInteractionStrength: playerInteractionStrength6,
+    normalMixEnabled: normalMixEnabled6,
+    normalMixFactor: normalMixFactor6,
+    aoEnabled: aoEnabled6,
+    aoIntensity: aoIntensity6,
+    fogEnabled: fogEnabled6,
+    fogNear: fogNear6,
+    fogFar: fogFar6,
+    fogColor: fogColor6,
+    fogIntensity: fogIntensity6,
+  } = useGrassClaude6Controls();
 
   // Get ImpostorForest controls
   const {
@@ -1564,6 +1618,61 @@ export const Map1 = ({
           fogFar={fogFar}
           fogColor={fogColor}
           fogIntensity={fogIntensity}
+        />
+      )}
+
+      {/* GrassField6 - Claude grass system v6 (Optimized) */}
+      {grassClaude6Enabled && (
+        <GrassField6
+          gridSize={gridSize6}
+          patchSpacing={patchSpacing6}
+          centerPosition={[0, 0, 0]}
+          playerPosition={characterPosition}
+          segments={segments6}
+          numGrass={numGrass6}
+          patchSize={patchSize6}
+          grassWidth={grassWidth6}
+          grassHeight={grassHeight6}
+          lodDistance={lodDistance6}
+          maxDistance={maxDistance6}
+          baseColor1={baseColor1_6}
+          baseColor2={baseColor2_6}
+          tipColor1={tipColor1_6}
+          tipColor2={tipColor2_6}
+          gradientBlend={gradientBlend6}
+          gradientCurve={gradientCurve6}
+          backscatterEnabled={backscatterEnabled6}
+          backscatterIntensity={backscatterIntensity6}
+          backscatterColor={backscatterColor6}
+          backscatterPower={backscatterPower6}
+          frontScatterStrength={frontScatterStrength6}
+          rimSSSStrength={rimSSSStrength6}
+          specularEnabled={specularEnabled6}
+          specularIntensity={specularIntensity6}
+          specularColor={specularColor6}
+          specularPower={specularPower6}
+          specularScale={specularScale6}
+          lightDirectionX={lightDirectionX6}
+          lightDirectionY={lightDirectionY6}
+          lightDirectionZ={lightDirectionZ6}
+          windEnabled={windEnabled6}
+          windStrength={windStrength6}
+          windDirectionScale={windDirectionScale6}
+          windDirectionSpeed={windDirectionSpeed6}
+          windStrengthScale={windStrengthScale6}
+          windStrengthSpeed={windStrengthSpeed6}
+          playerInteractionEnabled={playerInteractionEnabled6}
+          playerInteractionRange={playerInteractionRange6}
+          playerInteractionStrength={playerInteractionStrength6}
+          normalMixEnabled={normalMixEnabled6}
+          normalMixFactor={normalMixFactor6}
+          aoEnabled={aoEnabled6}
+          aoIntensity={aoIntensity6}
+          fogEnabled={fogEnabled6}
+          fogNear={fogNear6}
+          fogFar={fogFar6}
+          fogColor={fogColor6}
+          fogIntensity={fogIntensity6}
         />
       )}
 
