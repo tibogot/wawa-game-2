@@ -931,6 +931,7 @@ export function GrassPatch({
   playerInteractionRange = 2.5,
   playerInteractionStrength = 0.2,
   meshRef: externalMeshRef = null, // Optional external ref for frustum culling control
+  geometryRef = null, // Optional callback to expose geometry for adaptive LOD
 }) {
   const materialRef = useRef();
   const meshRef = useRef();
@@ -982,6 +983,18 @@ export function GrassPatch({
     () => createGrassGeometry(segments, numGrass, patchSize, grassHeight),
     [segments, numGrass, patchSize, grassHeight]
   );
+
+  // Expose geometry to parent for adaptive LOD
+  useEffect(() => {
+    if (geometryRef && geometry) {
+      geometryRef(geometry);
+    }
+    return () => {
+      if (geometryRef) {
+        geometryRef(null);
+      }
+    };
+  }, [geometry, geometryRef]);
 
   // Create material once
   const material = useMemo(
@@ -1473,6 +1486,16 @@ export function GrassField({
   const lastCameraPosRef = useRef(new THREE.Vector3());
   const lastCameraQuatRef = useRef(new THREE.Quaternion());
 
+  // OPTIMIZED: Adaptive LOD - Store geometry refs and distances for instance count reduction
+  const patchGeometryRefsRef = useRef(new Map());
+  const patchDistancesRef = useRef(new Map());
+  const LOD_DISTANCE_1 = 20; // Close: 100% instances
+  const LOD_DISTANCE_2 = 40; // Medium: 50% instances
+  const LOD_DISTANCE_3 = 60; // Far: 25% instances
+  const LOD_DISTANCE_4 = 100; // Very far: 12.5% instances
+  const LOD_UPDATE_INTERVAL = 200; // Update LOD every 200ms (5fps)
+  const lastLODUpdateRef = useRef(0);
+
   useFrame((state) => {
     const now = state.clock.elapsedTime * 1000; // Convert to milliseconds
     const cameraPos = camera.position;
@@ -1528,6 +1551,9 @@ export function GrassField({
       if (distanceSq <= CLOSE_DISTANCE_SQ) {
         patchRef.current.frustumCulled = false;
         patchRef.current.visible = true;
+        // Store distance for LOD (only calculate sqrt when needed)
+        const distance = Math.sqrt(distanceSq);
+        patchDistancesRef.current.set(index, distance);
         return;
       }
 
@@ -1535,13 +1561,22 @@ export function GrassField({
       if (distanceSq > MAX_CULLING_DISTANCE_SQ) {
         patchRef.current.frustumCulled = false;
         patchRef.current.visible = false;
+        // Store distance for LOD (only calculate sqrt when needed)
+        const distance = Math.sqrt(distanceSq);
+        patchDistancesRef.current.set(index, distance);
         return;
       }
+
+      // Calculate distance for patches in the middle range (needed for LOD and frustum)
+      const distance = Math.sqrt(distanceSq);
+      patchDistancesRef.current.set(index, distance);
 
       // Second check: Frustum culling
       // OPTIMIZED: Use cached bounding box instead of creating new one
       const boundingBox = patchBoundingBoxesRef.current.get(index);
-      if (!boundingBox) return;
+      if (!boundingBox) {
+        return;
+      }
 
       // Check if patch is in camera frustum (frustum is cached, so this is fast)
       const isInFrustum = frustumRef.current.intersectsBox(boundingBox);
@@ -1550,6 +1585,47 @@ export function GrassField({
       patchRef.current.frustumCulled = false;
       patchRef.current.visible = isInFrustum;
     });
+
+    // OPTIMIZED: Adaptive instance count reduction (throttled)
+    if (now - lastLODUpdateRef.current > LOD_UPDATE_INTERVAL) {
+      const baseNumGrass = grassProps.numGrass || 3072;
+
+      patchDistancesRef.current.forEach((distance, index) => {
+        const geometry = patchGeometryRefsRef.current.get(index);
+        const patchRef = patchRefsRef.current.get(index);
+        if (!geometry || !patchRef?.current) return;
+
+        // Only update LOD for visible patches
+        if (!patchRef.current.visible) {
+          // Set to minimum for invisible patches (will be restored when visible)
+          geometry.instanceCount = Math.floor(baseNumGrass * 0.125);
+          return;
+        }
+
+        // Calculate adaptive instance count based on distance
+        let instanceCount = baseNumGrass;
+        if (distance > LOD_DISTANCE_4) {
+          instanceCount = Math.floor(baseNumGrass * 0.125); // 12.5% for very far
+        } else if (distance > LOD_DISTANCE_3) {
+          instanceCount = Math.floor(baseNumGrass * 0.25); // 25% for far
+        } else if (distance > LOD_DISTANCE_2) {
+          instanceCount = Math.floor(baseNumGrass * 0.5); // 50% for medium
+        } else if (distance > LOD_DISTANCE_1) {
+          instanceCount = Math.floor(baseNumGrass * 0.75); // 75% for close-medium
+        }
+        // else: 100% for very close (LOD_DISTANCE_1 or less)
+
+        // Update instance count (clamp to max available)
+        // The "position" attribute is instanced, so count/3 gives number of instances
+        const positionAttr = geometry.getAttribute("position");
+        if (positionAttr) {
+          const maxInstances = positionAttr.count / 3;
+          geometry.instanceCount = Math.min(instanceCount, maxInstances);
+        }
+      });
+
+      lastLODUpdateRef.current = now;
+    }
   });
 
   return (
@@ -1558,6 +1634,9 @@ export function GrassField({
         <GrassPatch
           key={`${pos[0]}-${pos[2]}`}
           meshRef={patchRefs[i]}
+          geometryRef={(geo) => {
+            if (geo) patchGeometryRefsRef.current.set(i, geo);
+          }}
           position={pos}
           playerPosition={playerPosition}
           {...grassProps}
