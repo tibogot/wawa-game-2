@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 
 interface FloorDebugSpheresProps {
   heightmapLookup: ((x: number, z: number) => number) | null;
@@ -22,7 +22,10 @@ export const FloorDebugSpheres = ({
   // Generate sphere positions using heightmap lookup
   const spheres = useMemo(() => {
     if (!enabled || !heightmapLookup) {
-      console.log("🔴 FloorDebugSpheres: Not enabled or no heightmapLookup", { enabled, hasHeightmap: !!heightmapLookup });
+      console.log("🔴 FloorDebugSpheres: Not enabled or no heightmapLookup", {
+        enabled,
+        hasHeightmap: !!heightmapLookup,
+      });
       return [];
     }
 
@@ -34,10 +37,10 @@ export const FloorDebugSpheres = ({
       for (let z = -halfGrid; z <= halfGrid; z++) {
         const worldX = x * spacing;
         const worldZ = z * spacing;
-        
+
         // Use heightmap lookup to get terrain height
         const terrainHeight = heightmapLookup(worldX, worldZ);
-        
+
         positions.push([worldX, terrainHeight, worldZ]);
       }
     }
@@ -67,4 +70,3 @@ export const FloorDebugSpheres = ({
     </group>
   );
 };
-

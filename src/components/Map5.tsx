@@ -26,6 +26,8 @@ import { MovingShadowPlanes } from "./MovingShadowPlanes";
 import { useMovingShadowPlanesControls } from "./useMovingShadowPlanesControls";
 import { FloorDebugSpheres } from "./FloorDebugSpheres";
 import { useFloorDebugSpheresControls } from "./useFloorDebugSpheresControls";
+import { FloorDebugSpheresGlow } from "./FloorDebugSpheresGlow";
+import { useFloorDebugSpheresGlowControls } from "./useFloorDebugSpheresGlowControls";
 import * as THREE from "three";
 
 export const Map5 = ({
@@ -602,6 +604,17 @@ export const Map5 = ({
     emissiveIntensity,
   } = useFloorDebugSpheresControls();
 
+  // Get FloorDebugSpheresGlow controls
+  const {
+    enabled: floorDebugSpheresGlowEnabled,
+    gridSize: glowGridSize,
+    areaSize: glowAreaSize,
+    sphereSize: glowSphereSize,
+    sphereColor: glowSphereColor,
+    emissiveIntensity: glowEmissiveIntensity,
+    useRandomColors: glowUseRandomColors,
+  } = useFloorDebugSpheresGlowControls();
+
   // Calculate terrain height for WindFlag position
   // WindFlag positions pole center at poleHeight/2 above group position
   // So we need to place group at terrainHeight - poleHeight/2 to get pole base at terrainHeight
@@ -873,6 +886,19 @@ export const Map5 = ({
           sphereSize={sphereSize}
           sphereColor={sphereColor}
           emissiveIntensity={emissiveIntensity}
+        />
+      )}
+      {/* Floor Debug Spheres Glow - Visualize terrain height with glow effect */}
+      {floorDebugSpheresGlowEnabled && heightmapLookup && (
+        <FloorDebugSpheresGlow
+          heightmapLookup={heightmapLookup}
+          enabled={floorDebugSpheresGlowEnabled}
+          gridSize={glowGridSize}
+          areaSize={glowAreaSize}
+          sphereSize={glowSphereSize}
+          sphereColor={glowSphereColor}
+          emissiveIntensity={glowEmissiveIntensity}
+          useRandomColors={glowUseRandomColors}
         />
       )}
     </group>

@@ -22,6 +22,8 @@ import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
 import { useInstancedBillboardTreesControls } from "./useInstancedBillboardTreesControls";
 import { useInstancedPinesControls } from "./useInstancedPinesControls";
+import { useInstancedGrassSpriteControls } from "./useInstancedGrassSpriteControls";
+import { useYellowFlowerControls } from "./useYellowFlowerControls";
 import { useLensFlareControls } from "./useLensFlareControls";
 import LensFlare from "./LensFlare";
 import { FlowingLinesSimple } from "./FlowingLinesSimple";
@@ -41,6 +43,8 @@ import { Tree } from "./Tree";
 import { InstancedTrees } from "./InstancedTrees";
 import { InstancedBillboardTrees } from "./InstancedBillboardTrees";
 import { InstancedPines } from "./InstancedPines";
+import { InstancedGrassSprite } from "./InstancedGrassSprite";
+import { YellowFlower } from "./YellowFlower";
 import { WildflowerField } from "./WildflowerMeadow";
 import { TyphaReedField } from "./TyphaReedComponent";
 import Roseau from "./Roseau";
@@ -914,6 +918,50 @@ export const Map1 = ({
     viewThickenPower,
     viewThickenStrength,
   } = useInstancedTreesControls();
+
+  // Get InstancedGrassSprite controls
+  const {
+    instancedGrassSpriteEnabled,
+    instancedGrassSpriteCount,
+    instancedGrassSpritePositionX,
+    instancedGrassSpritePositionY,
+    instancedGrassSpritePositionZ,
+    instancedGrassSpriteRadius,
+    instancedGrassSpriteMinRadius,
+    instancedGrassSpriteScaleRangeMin,
+    instancedGrassSpriteScaleRangeMax,
+    instancedGrassSpriteScale,
+    instancedGrassSpriteCastShadow,
+    instancedGrassSpriteReceiveShadow,
+    instancedGrassSpriteEnableTransparentSorting,
+    instancedGrassSpriteEnableBVH,
+    instancedGrassSpriteBvhMargin,
+    instancedGrassSpriteEnableViewThickening,
+    instancedGrassSpriteViewThickenPower,
+    instancedGrassSpriteViewThickenStrength,
+  } = useInstancedGrassSpriteControls();
+
+  // Get YellowFlower controls
+  const {
+    yellowFlowerEnabled,
+    yellowFlowerCount,
+    yellowFlowerPositionX,
+    yellowFlowerPositionY,
+    yellowFlowerPositionZ,
+    yellowFlowerRadius,
+    yellowFlowerMinRadius,
+    yellowFlowerScaleRangeMin,
+    yellowFlowerScaleRangeMax,
+    yellowFlowerScale,
+    yellowFlowerCastShadow,
+    yellowFlowerReceiveShadow,
+    yellowFlowerEnableTransparentSorting,
+    yellowFlowerEnableBVH,
+    yellowFlowerBvhMargin,
+    yellowFlowerEnableViewThickening,
+    yellowFlowerViewThickenPower,
+    yellowFlowerViewThickenStrength,
+  } = useYellowFlowerControls();
 
   // Get InstancedAnimatedTrees controls
   const { instancedAnimatedTreesEnabled } = useInstancedAnimatedTreesControls();
@@ -1894,6 +1942,64 @@ export const Map1 = ({
           enableViewThickening={enableViewThickening}
           viewThickenPower={viewThickenPower}
           viewThickenStrength={viewThickenStrength}
+        />
+      )}
+
+      {/* Instanced Grass Sprite - Using InstancedMesh2 */}
+      {instancedGrassSpriteEnabled && (
+        <InstancedGrassSprite
+          count={instancedGrassSpriteCount}
+          position={[
+            instancedGrassSpritePositionX,
+            instancedGrassSpritePositionY,
+            instancedGrassSpritePositionZ,
+          ]}
+          radius={instancedGrassSpriteRadius}
+          minRadius={instancedGrassSpriteMinRadius}
+          scaleRange={[
+            instancedGrassSpriteScaleRangeMin * instancedGrassSpriteScale,
+            instancedGrassSpriteScaleRangeMax * instancedGrassSpriteScale,
+          ]}
+          enabled={instancedGrassSpriteEnabled}
+          getTerrainHeight={getGroundHeight}
+          enableBVH={instancedGrassSpriteEnableBVH}
+          bvhMargin={instancedGrassSpriteBvhMargin}
+          castShadow={instancedGrassSpriteCastShadow}
+          receiveShadow={instancedGrassSpriteReceiveShadow}
+          enableTransparentSorting={
+            instancedGrassSpriteEnableTransparentSorting
+          }
+          enableViewThickening={instancedGrassSpriteEnableViewThickening}
+          viewThickenPower={instancedGrassSpriteViewThickenPower}
+          viewThickenStrength={instancedGrassSpriteViewThickenStrength}
+        />
+      )}
+
+      {/* Yellow Flower - Using InstancedMesh2 */}
+      {yellowFlowerEnabled && (
+        <YellowFlower
+          count={yellowFlowerCount}
+          position={[
+            yellowFlowerPositionX,
+            yellowFlowerPositionY,
+            yellowFlowerPositionZ,
+          ]}
+          radius={yellowFlowerRadius}
+          minRadius={yellowFlowerMinRadius}
+          scaleRange={[
+            yellowFlowerScaleRangeMin * yellowFlowerScale,
+            yellowFlowerScaleRangeMax * yellowFlowerScale,
+          ]}
+          enabled={yellowFlowerEnabled}
+          getTerrainHeight={getGroundHeight}
+          enableBVH={yellowFlowerEnableBVH}
+          bvhMargin={yellowFlowerBvhMargin}
+          castShadow={yellowFlowerCastShadow}
+          receiveShadow={yellowFlowerReceiveShadow}
+          enableTransparentSorting={yellowFlowerEnableTransparentSorting}
+          enableViewThickening={yellowFlowerEnableViewThickening}
+          viewThickenPower={yellowFlowerViewThickenPower}
+          viewThickenStrength={yellowFlowerViewThickenStrength}
         />
       )}
 
