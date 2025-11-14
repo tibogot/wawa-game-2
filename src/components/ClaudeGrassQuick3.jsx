@@ -839,7 +839,7 @@ function randRange(min, max) {
 }
 
 // Create geometry for grass
-function createGrassGeometry(segments) {
+function createGrassGeometry(segments, numGrass) {
   setSeed(0);
 
   const VERTICES = (segments + 1) * 2;
@@ -860,7 +860,7 @@ function createGrassGeometry(segments) {
 
   // Create random offsets for each blade within patch
   const offsets = [];
-  for (let i = 0; i < NUM_GRASS; ++i) {
+  for (let i = 0; i < numGrass; ++i) {
     offsets.push(randRange(-GRASS_PATCH_SIZE * 0.5, GRASS_PATCH_SIZE * 0.5));
     offsets.push(randRange(-GRASS_PATCH_SIZE * 0.5, GRASS_PATCH_SIZE * 0.5));
     offsets.push(0);
@@ -876,7 +876,7 @@ function createGrassGeometry(segments) {
   }
 
   const geo = new THREE.InstancedBufferGeometry();
-  geo.instanceCount = NUM_GRASS;
+  geo.instanceCount = numGrass;
   geo.setAttribute("vertIndex", new THREE.Uint8BufferAttribute(vertID, 1));
   geo.setAttribute(
     "position",
@@ -960,6 +960,7 @@ export default function ClaudeGrassQuick3({
   backscatterPower = 2.0,
   frontScatterStrength = 0.3,
   rimSSSStrength = 0.5,
+  grassDensity = 3072, // Number of grass blades per patch (default: 32*32*3)
 }) {
   const groupRef = useRef();
   const { camera } = useThree();
@@ -1009,11 +1010,11 @@ export default function ClaudeGrassQuick3({
     backscatterColor,
   ]);
 
-  // Create geometries and materials ONCE - never recreate them
+  // Create geometries and materials - recreate when grassDensity changes
   const { geometryLow, geometryHigh, materialLow, materialHigh, heightmap } =
     useMemo(() => {
-      const geoLow = createGrassGeometry(GRASS_SEGMENTS_LOW);
-      const geoHigh = createGrassGeometry(GRASS_SEGMENTS_HIGH);
+      const geoLow = createGrassGeometry(GRASS_SEGMENTS_LOW, grassDensity);
+      const geoHigh = createGrassGeometry(GRASS_SEGMENTS_HIGH, grassDensity);
       const hmap = createHeightmap();
 
       const createMaterial = (segments, vertices) => {
@@ -1143,7 +1144,7 @@ export default function ClaudeGrassQuick3({
         materialHigh: matHigh,
         heightmap: hmap,
       };
-    }, []); // Empty dependencies - create only once!
+    }, [grassDensity]); // Recreate when grassDensity changes
 
   // Mesh pools
   const meshPoolLow = useRef([]);

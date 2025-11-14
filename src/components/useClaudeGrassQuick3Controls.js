@@ -25,6 +25,13 @@ export default function useClaudeGrassQuick3Controls() {
           step: 0.01,
           label: "📐 Grass Width",
         },
+        grassDensity: {
+          value: 3072,
+          min: 256,
+          max: 10000,
+          step: 256,
+          label: "🌱 Grass Density (Blades per Patch)",
+        },
 
         // Grid and spacing
         gridSize: {

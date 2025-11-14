@@ -1733,6 +1733,7 @@ export const Map1 = ({
           heightOffset={claudeGrassQuick3Controls.heightOffset}
           grassWidth={claudeGrassQuick3Controls.grassWidth}
           grassHeight={claudeGrassQuick3Controls.grassHeight}
+          grassDensity={claudeGrassQuick3Controls.grassDensity}
           lodDistance={claudeGrassQuick3Controls.lodDistance}
           maxDistance={claudeGrassQuick3Controls.maxDistance}
           patchSize={claudeGrassQuick3Controls.patchSize}
