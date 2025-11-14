@@ -533,6 +533,9 @@ uniform sampler2D grassTexture;
 uniform vec3 grassLODColour;
 uniform float time;
 uniform mat3 normalMatrix;
+uniform vec3 customLightDirection;
+uniform vec3 customSpecularColor;
+uniform float customSpecularIntensity;
 
 // Utility functions
 // Note: saturate might be defined by Three.js, so we check and undefine if needed
@@ -696,7 +699,19 @@ void main() {
   #include <lights_fragment_end>
   #include <aomap_fragment>
   
-  outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;
+  // Add custom specular highlight using custom light direction (moon reflection)
+  vec3 customSpecular = vec3(0.0);
+  #ifdef CUSTOM_SPECULAR_ENABLED
+    vec3 viewDirNormalized = normalize(viewDir);
+    vec3 lightDirNormalized = normalize(customLightDirection);
+    vec3 halfVector = normalize(viewDirNormalized + lightDirNormalized);
+    float NdotH = max(dot(normal, halfVector), 0.0);
+    float specularPower = pow(NdotH, shininess);
+    float NdotL = max(dot(normal, lightDirNormalized), 0.0);
+    customSpecular = customSpecularColor * specularPower * NdotL * customSpecularIntensity;
+  #endif
+  
+  outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance + customSpecular;
 
   #include <envmap_fragment>
   #include <opaque_fragment>
@@ -736,7 +751,7 @@ function randRange(min, max) {
 }
 
 // Create geometry for grass
-function createGrassGeometry(segments) {
+function createGrassGeometry(segments, patchSize = GRASS_PATCH_SIZE) {
   setSeed(0);
 
   const VERTICES = (segments + 1) * 2;
@@ -758,8 +773,8 @@ function createGrassGeometry(segments) {
   // Create random offsets for each blade within patch
   const offsets = [];
   for (let i = 0; i < NUM_GRASS; ++i) {
-    offsets.push(randRange(-GRASS_PATCH_SIZE * 0.5, GRASS_PATCH_SIZE * 0.5));
-    offsets.push(randRange(-GRASS_PATCH_SIZE * 0.5, GRASS_PATCH_SIZE * 0.5));
+    offsets.push(randRange(-patchSize * 0.5, patchSize * 0.5));
+    offsets.push(randRange(-patchSize * 0.5, patchSize * 0.5));
     offsets.push(0);
   }
 
@@ -782,7 +797,7 @@ function createGrassGeometry(segments) {
   geo.setIndex(indices);
   geo.boundingSphere = new THREE.Sphere(
     new THREE.Vector3(0, 0, 0),
-    1 + GRASS_PATCH_SIZE * 2
+    1 + patchSize * 2
   );
 
   return geo;
@@ -808,31 +823,72 @@ function createHeightmap() {
 }
 
 // Main component
-export default function ClaudeGrassFixed({
+export default function ClaudeGrassQuick2({
   playerPosition = new THREE.Vector3(0, 0, 0),
   terrainSize = 100,
   heightScale = 1,
   heightOffset = 0,
+  grassWidth = GRASS_WIDTH,
+  grassHeight = GRASS_HEIGHT,
+  lodDistance = GRASS_LOD_DIST,
+  maxDistance = GRASS_MAX_DIST,
+  patchSize = GRASS_PATCH_SIZE,
+  specularEnabled = false,
+  lightAzimuth = 225,
+  lightElevation = 45,
+  specularColor = { r: 0.9, g: 0.95, b: 1.0 },
+  specularIntensity = 0.5,
+  shininess = 30,
 }) {
+  console.log("🌿 ClaudeGrassQuick2 component called with props:", {
+    terrainSize,
+    grassHeight,
+    grassWidth,
+    enabled: true,
+  });
   const groupRef = useRef();
   const { camera } = useThree();
 
-  // Create geometries and materials
+  // Create geometries and materials (materials are updated in useFrame, not recreated)
   const { geometryLow, geometryHigh, materialLow, materialHigh, heightmap } =
     useMemo(() => {
-      const geoLow = createGrassGeometry(GRASS_SEGMENTS_LOW);
-      const geoHigh = createGrassGeometry(GRASS_SEGMENTS_HIGH);
+      const geoLow = createGrassGeometry(GRASS_SEGMENTS_LOW, patchSize);
+      const geoHigh = createGrassGeometry(GRASS_SEGMENTS_HIGH, patchSize);
       const hmap = createHeightmap();
+
+      // Calculate light direction from azimuth and elevation
+      const azimuthRad = (lightAzimuth * Math.PI) / 180;
+      const elevationRad = (lightElevation * Math.PI) / 180;
+      const lightDir = new THREE.Vector3(
+        Math.cos(elevationRad) * Math.sin(azimuthRad),
+        Math.sin(elevationRad),
+        Math.cos(elevationRad) * Math.cos(azimuthRad)
+      ).normalize();
+
+      // Convert specular color from object to THREE.Color
+      const specColor = new THREE.Color(
+        specularColor.r,
+        specularColor.g,
+        specularColor.b
+      );
 
       const createMaterial = (segments, vertices) => {
         const mat = new THREE.MeshPhongMaterial({
           color: 0x00ff00,
           side: THREE.FrontSide,
+          specular: specColor,
+          shininess: shininess,
         });
 
         mat.onBeforeCompile = (shader) => {
+          // Add define for specular enable/disable
+          if (specularEnabled) {
+            shader.defines.CUSTOM_SPECULAR_ENABLED = "";
+          }
+
+          // Initialize uniforms (will be updated in useFrame)
           shader.uniforms.grassSize = {
-            value: new THREE.Vector2(GRASS_WIDTH, GRASS_HEIGHT),
+            value: new THREE.Vector2(grassWidth, grassHeight),
           };
           shader.uniforms.grassParams = {
             value: new THREE.Vector4(
@@ -843,7 +899,7 @@ export default function ClaudeGrassFixed({
             ),
           };
           shader.uniforms.grassDraw = {
-            value: new THREE.Vector4(GRASS_LOD_DIST, GRASS_MAX_DIST, 0, 0),
+            value: new THREE.Vector4(lodDistance, maxDistance, 0, 0),
           };
           shader.uniforms.time = { value: 0.0 };
           shader.uniforms.heightmap = { value: hmap };
@@ -852,6 +908,11 @@ export default function ClaudeGrassFixed({
           };
           shader.uniforms.playerPos = { value: playerPosition };
           shader.uniforms.viewMatrixInverse = { value: new THREE.Matrix4() };
+          shader.uniforms.customLightDirection = { value: lightDir.clone() };
+          shader.uniforms.customSpecularColor = { value: specColor.clone() };
+          shader.uniforms.customSpecularIntensity = {
+            value: specularIntensity,
+          };
 
           // Replace shaders with complete versions
           shader.vertexShader = vertexShader;
@@ -876,12 +937,61 @@ export default function ClaudeGrassFixed({
         materialHigh: matHigh,
         heightmap: hmap,
       };
-    }, [terrainSize, heightScale, heightOffset, playerPosition]);
+    }, [
+      // Only recreate when these change (geometries and initial material setup)
+      patchSize,
+      // Materials will be updated dynamically in useFrame
+    ]);
 
   // Mesh pools
   const meshPoolLow = useRef([]);
   const meshPoolHigh = useRef([]);
   const totalTime = useRef(0);
+
+  // Update material properties when props change (without recreating materials)
+  useEffect(() => {
+    if (!materialLow || !materialHigh) return;
+
+    // Update material specular properties
+    const specColor =
+      specularColor && typeof specularColor === "object" && "r" in specularColor
+        ? new THREE.Color(
+            specularColor.r || 0.9,
+            specularColor.g || 0.95,
+            specularColor.b || 1.0
+          )
+        : new THREE.Color(0.9, 0.95, 1.0);
+
+    if (specularEnabled) {
+      materialLow.specular = specColor;
+      materialLow.shininess = shininess;
+      materialHigh.specular = specColor;
+      materialHigh.shininess = shininess;
+    } else {
+      materialLow.specular = new THREE.Color(0, 0, 0);
+      materialLow.shininess = 30;
+      materialHigh.specular = new THREE.Color(0, 0, 0);
+      materialHigh.shininess = 30;
+    }
+
+    // Update shader defines if shaders are already compiled
+    if (materialLow.userData.shader && materialLow.userData.shader.defines) {
+      if (specularEnabled) {
+        materialLow.userData.shader.defines.CUSTOM_SPECULAR_ENABLED = "";
+      } else {
+        delete materialLow.userData.shader.defines.CUSTOM_SPECULAR_ENABLED;
+      }
+      materialLow.needsUpdate = true;
+    }
+    if (materialHigh.userData.shader && materialHigh.userData.shader.defines) {
+      if (specularEnabled) {
+        materialHigh.userData.shader.defines.CUSTOM_SPECULAR_ENABLED = "";
+      } else {
+        delete materialHigh.userData.shader.defines.CUSTOM_SPECULAR_ENABLED;
+      }
+      materialHigh.needsUpdate = true;
+    }
+  }, [materialLow, materialHigh, specularEnabled, specularColor, shininess]);
 
   // Update function
   useFrame((state, delta) => {
@@ -889,18 +999,112 @@ export default function ClaudeGrassFixed({
 
     totalTime.current += delta;
 
-    // Update shader uniforms
+    // Calculate light direction from azimuth and elevation
+    const azimuthRad = (lightAzimuth * Math.PI) / 180;
+    const elevationRad = (lightElevation * Math.PI) / 180;
+    const lightDir = new THREE.Vector3(
+      Math.cos(elevationRad) * Math.sin(azimuthRad),
+      Math.sin(elevationRad),
+      Math.cos(elevationRad) * Math.cos(azimuthRad)
+    ).normalize();
+
+    // Convert specular color (with safety check)
+    const specColor =
+      specularColor && typeof specularColor === "object" && "r" in specularColor
+        ? new THREE.Color(
+            specularColor.r || 0.9,
+            specularColor.g || 0.95,
+            specularColor.b || 1.0
+          )
+        : new THREE.Color(0.9, 0.95, 1.0);
+
+    // Update material properties (only if specular is enabled)
+    if (specularEnabled) {
+      materialLow.specular = specColor;
+      materialLow.shininess = shininess;
+      materialHigh.specular = specColor;
+      materialHigh.shininess = shininess;
+    } else {
+      materialLow.specular = new THREE.Color(0, 0, 0);
+      materialLow.shininess = 30;
+      materialHigh.specular = new THREE.Color(0, 0, 0);
+      materialHigh.shininess = 30;
+    }
+
+    // Update shader defines for specular enable/disable
     if (materialLow.userData.shader) {
-      materialLow.userData.shader.uniforms.time.value = totalTime.current;
-      materialLow.userData.shader.uniforms.playerPos.value = playerPosition;
-      materialLow.userData.shader.uniforms.viewMatrixInverse.value =
-        camera.matrixWorld;
+      const shader = materialLow.userData.shader;
+      if (shader.defines) {
+        if (specularEnabled) {
+          shader.defines.CUSTOM_SPECULAR_ENABLED = "";
+        } else {
+          delete shader.defines.CUSTOM_SPECULAR_ENABLED;
+        }
+        materialLow.needsUpdate = true;
+      }
     }
     if (materialHigh.userData.shader) {
-      materialHigh.userData.shader.uniforms.time.value = totalTime.current;
-      materialHigh.userData.shader.uniforms.playerPos.value = playerPosition;
-      materialHigh.userData.shader.uniforms.viewMatrixInverse.value =
-        camera.matrixWorld;
+      const shader = materialHigh.userData.shader;
+      if (shader.defines) {
+        if (specularEnabled) {
+          shader.defines.CUSTOM_SPECULAR_ENABLED = "";
+        } else {
+          delete shader.defines.CUSTOM_SPECULAR_ENABLED;
+        }
+        materialHigh.needsUpdate = true;
+      }
+    }
+
+    // Update shader uniforms dynamically
+    if (materialLow.userData.shader) {
+      const shader = materialLow.userData.shader;
+      if (!shader.uniforms) {
+        // Skip if uniforms not initialized yet
+      } else {
+        shader.uniforms.time.value = totalTime.current;
+        shader.uniforms.playerPos.value =
+          playerPosition || new THREE.Vector3(0, 0, 0);
+        shader.uniforms.viewMatrixInverse.value = camera.matrixWorld;
+        shader.uniforms.grassSize.value.set(grassWidth, grassHeight);
+        shader.uniforms.grassParams.value.set(
+          GRASS_SEGMENTS_LOW,
+          GRASS_VERTICES_LOW,
+          heightScale,
+          heightOffset
+        );
+        shader.uniforms.grassDraw.value.set(lodDistance, maxDistance, 0, 0);
+        shader.uniforms.heightParams.value.set(terrainSize, 0, 0, 0);
+        if (specularEnabled) {
+          shader.uniforms.customLightDirection.value.copy(lightDir);
+          shader.uniforms.customSpecularColor.value.copy(specColor);
+          shader.uniforms.customSpecularIntensity.value = specularIntensity;
+        }
+      }
+    }
+    if (materialHigh.userData.shader) {
+      const shader = materialHigh.userData.shader;
+      if (!shader.uniforms) {
+        // Skip if uniforms not initialized yet
+      } else {
+        shader.uniforms.time.value = totalTime.current;
+        shader.uniforms.playerPos.value =
+          playerPosition || new THREE.Vector3(0, 0, 0);
+        shader.uniforms.viewMatrixInverse.value = camera.matrixWorld;
+        shader.uniforms.grassSize.value.set(grassWidth, grassHeight);
+        shader.uniforms.grassParams.value.set(
+          GRASS_SEGMENTS_HIGH,
+          GRASS_VERTICES_HIGH,
+          heightScale,
+          heightOffset
+        );
+        shader.uniforms.grassDraw.value.set(lodDistance, maxDistance, 0, 0);
+        shader.uniforms.heightParams.value.set(terrainSize, 0, 0, 0);
+        if (specularEnabled) {
+          shader.uniforms.customLightDirection.value.copy(lightDir);
+          shader.uniforms.customSpecularColor.value.copy(specColor);
+          shader.uniforms.customSpecularIntensity.value = specularIntensity;
+        }
+      }
     }
 
     // Frustum culling setup
@@ -914,17 +1118,19 @@ export default function ClaudeGrassFixed({
 
     // Calculate base cell position
     const baseCellPos = camera.position.clone();
-    baseCellPos.divideScalar(GRASS_PATCH_SIZE);
+    baseCellPos.divideScalar(patchSize);
     baseCellPos.floor();
-    baseCellPos.multiplyScalar(GRASS_PATCH_SIZE);
+    baseCellPos.multiplyScalar(patchSize);
 
-    // Hide all meshes
-    groupRef.current.children.forEach((child) => {
-      child.visible = false;
-    });
+    // Hide all meshes (with safety check)
+    if (groupRef.current && groupRef.current.children) {
+      groupRef.current.children.forEach((child) => {
+        if (child) child.visible = false;
+      });
+    }
 
-    const meshesLowAvailable = [...meshPoolLow.current];
-    const meshesHighAvailable = [...meshPoolHigh.current];
+    const meshesLowAvailable = [...(meshPoolLow.current || [])];
+    const meshesHighAvailable = [...(meshPoolHigh.current || [])];
 
     const cameraPosXZ = new THREE.Vector3(
       camera.position.x,
@@ -937,26 +1143,26 @@ export default function ClaudeGrassFixed({
     for (let x = -16; x < 16; x++) {
       for (let z = -16; z < 16; z++) {
         const currentCell = new THREE.Vector3(
-          baseCellPos.x + x * GRASS_PATCH_SIZE,
+          baseCellPos.x + x * patchSize,
           0,
-          baseCellPos.z + z * GRASS_PATCH_SIZE
+          baseCellPos.z + z * patchSize
         );
 
         aabbTmp.setFromCenterAndSize(
           currentCell,
-          new THREE.Vector3(GRASS_PATCH_SIZE, 1000, GRASS_PATCH_SIZE)
+          new THREE.Vector3(patchSize, 1000, patchSize)
         );
 
         const distToCell = aabbTmp.distanceToPoint(cameraPosXZ);
 
         // Distance culling
-        if (distToCell > GRASS_MAX_DIST) continue;
+        if (distToCell > maxDistance) continue;
 
         // Frustum culling
         if (!frustum.intersectsBox(aabbTmp)) continue;
 
         // LOD selection
-        const useLowLOD = distToCell > GRASS_LOD_DIST;
+        const useLowLOD = distToCell > lodDistance;
         const meshPool = useLowLOD ? meshesLowAvailable : meshesHighAvailable;
         const geo = useLowLOD ? geometryLow : geometryHigh;
         const mat = useLowLOD ? materialLow : materialHigh;
@@ -972,8 +1178,10 @@ export default function ClaudeGrassFixed({
           groupRef.current.add(mesh);
 
           if (useLowLOD) {
+            if (!meshPoolLow.current) meshPoolLow.current = [];
             meshPoolLow.current.push(mesh);
           } else {
+            if (!meshPoolHigh.current) meshPoolHigh.current = [];
             meshPoolHigh.current.push(mesh);
           }
         }

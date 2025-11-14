@@ -11,6 +11,7 @@ import { GrassField as GrassField4 } from "./GrassClaude4";
 import { GrassField as GrassField6 } from "./GrassClaude6";
 import { GrassField as GrassField7 } from "./GrassClaude7";
 import ClaudeGrassQuick from "./ClaudeGrassQuick";
+import ClaudeGrassQuick2 from "./ClaudeGrassQuick2";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
@@ -23,6 +24,7 @@ import { useGrassClaude4Controls } from "./useGrassClaude4Controls";
 import { useGrassClaude6Controls } from "./useGrassClaude6Controls";
 import { useGrassClaude7Controls } from "./useGrassClaude7Controls";
 import useClaudeGrassQuickControls from "./useClaudeGrassQuickControls";
+import useClaudeGrassQuick2Controls from "./useClaudeGrassQuick2Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
@@ -281,6 +283,9 @@ export const Map1 = ({
 
   // Get ClaudeGrassQuick controls
   const claudeGrassQuickControls = useClaudeGrassQuickControls();
+  // Get ClaudeGrassQuick2 controls
+  // Leva flattens folder structure - all properties are at top level
+  const claudeGrassQuick2Controls = useClaudeGrassQuick2Controls();
 
   // Get ImpostorForest controls
   const {
@@ -1665,6 +1670,34 @@ export const Map1 = ({
           heightOffset={claudeGrassQuickControls.heightOffset}
         />
       )}
+
+      {/* ClaudeGrassQuick2 - Quick_Grass port with advanced shaders (Working Version) */}
+      {claudeGrassQuick2Controls &&
+        claudeGrassQuick2Controls.enabled === true && (
+          <ClaudeGrassQuick2
+            playerPosition={
+              new THREE.Vector3(
+                characterPosition[0],
+                characterPosition[1],
+                characterPosition[2]
+              )
+            }
+            terrainSize={claudeGrassQuick2Controls.terrainSize}
+            heightScale={claudeGrassQuick2Controls.heightScale}
+            heightOffset={claudeGrassQuick2Controls.heightOffset}
+            grassWidth={claudeGrassQuick2Controls.grassWidth}
+            grassHeight={claudeGrassQuick2Controls.grassHeight}
+            lodDistance={claudeGrassQuick2Controls.lodDistance}
+            maxDistance={claudeGrassQuick2Controls.maxDistance}
+            patchSize={claudeGrassQuick2Controls.patchSize}
+            specularEnabled={claudeGrassQuick2Controls.specularEnabled}
+            lightAzimuth={claudeGrassQuick2Controls.lightAzimuth}
+            lightElevation={claudeGrassQuick2Controls.lightElevation}
+            specularColor={claudeGrassQuick2Controls.specularColor}
+            specularIntensity={claudeGrassQuick2Controls.specularIntensity}
+            shininess={claudeGrassQuick2Controls.shininess}
+          />
+        )}
 
       {/* GrassField6 - Claude grass system v6 (Optimized) */}
       {false && grassClaude6Enabled && (
