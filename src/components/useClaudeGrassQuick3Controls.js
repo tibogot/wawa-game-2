@@ -178,6 +178,63 @@ export default function useClaudeGrassQuick3Controls() {
               step: 0.1,
               label: "AO Intensity",
             },
+            grassMiddleBrightnessMin: {
+              value: 0.85,
+              min: 0.0,
+              max: 1.0,
+              step: 0.01,
+              label: "Middle Brightness (Min)",
+            },
+            grassMiddleBrightnessMax: {
+              value: 1.0,
+              min: 0.0,
+              max: 1.0,
+              step: 0.01,
+              label: "Edge Brightness (Max)",
+            },
+          },
+          { collapsed: true }
+        ),
+
+        // Specular Controls
+        specular: folder(
+          {
+            specularEnabled: {
+              value: false,
+              label: "Enable Specular",
+            },
+            specularIntensity: {
+              value: 2.0,
+              min: 0.0,
+              max: 5.0,
+              step: 0.1,
+              label: "Intensity",
+            },
+            specularColor: {
+              value: "#ffffff",
+              label: "Color",
+            },
+            specularDirectionX: {
+              value: -1.0,
+              min: -1.0,
+              max: 1.0,
+              step: 0.1,
+              label: "Direction X",
+            },
+            specularDirectionY: {
+              value: 1.0,
+              min: -1.0,
+              max: 1.0,
+              step: 0.1,
+              label: "Direction Y",
+            },
+            specularDirectionZ: {
+              value: 0.5,
+              min: -1.0,
+              max: 1.0,
+              step: 0.1,
+              label: "Direction Z",
+            },
           },
           { collapsed: true }
         ),

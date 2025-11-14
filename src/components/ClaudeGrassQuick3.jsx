@@ -549,6 +549,12 @@ uniform float uFogNear;
 uniform float uFogFar;
 uniform float uFogIntensity;
 uniform vec3 uFogColor;
+uniform bool uSpecularEnabled;
+uniform float uSpecularIntensity;
+uniform vec3 uSpecularColor;
+uniform vec3 uSpecularDirection;
+uniform float uGrassMiddleBrightnessMin;
+uniform float uGrassMiddleBrightnessMax;
 
 // Utility functions
 // Note: saturate might be defined by Three.js, so we check and undefine if needed
@@ -693,7 +699,7 @@ void main() {
   }
 
   diffuseColor.rgb *= vGrassColour;
-  diffuseColor.rgb *= mix(0.85, 1.0, grassMiddle);
+  diffuseColor.rgb *= mix(uGrassMiddleBrightnessMin, uGrassMiddleBrightnessMax, grassMiddle);
 
   reflectedLight = ReflectedLight(vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
   totalEmissiveRadiance = emissive;
@@ -721,6 +727,30 @@ void main() {
   #include <lights_fragment_begin>
   #include <lights_fragment_maps>
   #include <lights_fragment_end>
+  
+  // Specular highlight (moon reflection style)
+  if (uSpecularEnabled && uSpecularIntensity > 0.0) {
+    // Use vertex normal for consistent specular across grass blades
+    vec3 specularNormal = normalize(vNormal2);
+    vec3 viewDir = normalize(-vViewPosition);
+    // Specular direction in world space
+    vec3 specDir = normalize(uSpecularDirection);
+    // Reflect specular direction off normal
+    vec3 specReflectDir = reflect(-specDir, specularNormal);
+    // Calculate specular highlight (using same power as simonDevGrass22: 25.6)
+    float spec = pow(max(dot(viewDir, specReflectDir), 0.0), 25.6);
+    
+    // Distance-based falloff - reduce specular when camera is close to prevent red glow on nearby grass
+    float specularDepth = length(vViewPosition);
+    float distanceFalloff = smoothstep(2.0, 10.0, specularDepth);
+    // Also add tip falloff - specular should be stronger at tips
+    float tipFalloff = smoothstep(0.5, 1.0, heightPercent);
+    
+    // Apply color, intensity, distance falloff, tip falloff, and 3x multiplier for visibility
+    vec3 specular = uSpecularColor * spec * uSpecularIntensity * distanceFalloff * tipFalloff * 3.0;
+    reflectedLight.directSpecular += specular;
+  }
+  
   #include <aomap_fragment>
   
   outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;
@@ -865,11 +895,19 @@ export default function ClaudeGrassQuick3({
   gradientCurve = 4.0,
   aoEnabled = true,
   aoIntensity = 1.0,
+  grassMiddleBrightnessMin = 0.85,
+  grassMiddleBrightnessMax = 1.0,
   fogEnabled = false,
   fogNear = 5.0,
   fogFar = 50.0,
   fogIntensity = 1.0,
   fogColor = "#4f74af",
+  specularEnabled = false,
+  specularIntensity = 2.0,
+  specularColor = "#ffffff",
+  specularDirectionX = -1.0,
+  specularDirectionY = 1.0,
+  specularDirectionZ = 0.5,
 }) {
   const groupRef = useRef();
   const { camera } = useThree();
@@ -890,6 +928,7 @@ export default function ClaudeGrassQuick3({
   const tipColor1Ref = useRef(convertSRGBToLinear(tipColor1));
   const tipColor2Ref = useRef(convertSRGBToLinear(tipColor2));
   const fogColorRef = useRef(convertSRGBToLinear(fogColor));
+  const specularColorRef = useRef(convertSRGBToLinear(specularColor));
 
   // Update color refs when props change - convert to linear space
   useEffect(() => {
@@ -898,12 +937,14 @@ export default function ClaudeGrassQuick3({
     const c3 = convertSRGBToLinear(tipColor1);
     const c4 = convertSRGBToLinear(tipColor2);
     const fog = convertSRGBToLinear(fogColor);
+    const spec = convertSRGBToLinear(specularColor);
     baseColor1Ref.current.copy(c1);
     baseColor2Ref.current.copy(c2);
     tipColor1Ref.current.copy(c3);
     tipColor2Ref.current.copy(c4);
     fogColorRef.current.copy(fog);
-  }, [baseColor1, baseColor2, tipColor1, tipColor2, fogColor]);
+    specularColorRef.current.copy(spec);
+  }, [baseColor1, baseColor2, tipColor1, tipColor2, fogColor, specularColor]);
 
   // Create geometries and materials ONCE - never recreate them
   const { geometryLow, geometryHigh, materialLow, materialHigh, heightmap } =
@@ -985,6 +1026,24 @@ export default function ClaudeGrassQuick3({
           shader.uniforms.uFogFar = { value: fogFar };
           shader.uniforms.uFogIntensity = { value: fogIntensity };
           shader.uniforms.uFogColor = { value: fogColorRef.current.clone() };
+          shader.uniforms.uSpecularEnabled = { value: specularEnabled };
+          shader.uniforms.uSpecularIntensity = { value: specularIntensity };
+          shader.uniforms.uSpecularColor = {
+            value: specularColorRef.current.clone(),
+          };
+          shader.uniforms.uSpecularDirection = {
+            value: new THREE.Vector3(
+              specularDirectionX,
+              specularDirectionY,
+              specularDirectionZ
+            ).normalize(),
+          };
+          shader.uniforms.uGrassMiddleBrightnessMin = {
+            value: grassMiddleBrightnessMin,
+          };
+          shader.uniforms.uGrassMiddleBrightnessMax = {
+            value: grassMiddleBrightnessMax,
+          };
 
           // Replace shaders with complete versions
           shader.vertexShader = vertexShader;
@@ -1137,6 +1196,20 @@ export default function ClaudeGrassQuick3({
       materialLow.userData.shader.uniforms.uFogColor.value.copy(
         fogColorRef.current
       );
+      materialLow.userData.shader.uniforms.uSpecularEnabled.value =
+        specularEnabled;
+      materialLow.userData.shader.uniforms.uSpecularIntensity.value =
+        specularIntensity;
+      materialLow.userData.shader.uniforms.uSpecularColor.value.copy(
+        specularColorRef.current
+      );
+      materialLow.userData.shader.uniforms.uSpecularDirection.value
+        .set(specularDirectionX, specularDirectionY, specularDirectionZ)
+        .normalize();
+      materialLow.userData.shader.uniforms.uGrassMiddleBrightnessMin.value =
+        grassMiddleBrightnessMin;
+      materialLow.userData.shader.uniforms.uGrassMiddleBrightnessMax.value =
+        grassMiddleBrightnessMax;
 
       // Debug log uniforms every 60 frames
       if (Math.floor(totalTime.current * 60) % 60 === 0) {
@@ -1215,6 +1288,20 @@ export default function ClaudeGrassQuick3({
       materialHigh.userData.shader.uniforms.uFogColor.value.copy(
         fogColorRef.current
       );
+      materialHigh.userData.shader.uniforms.uSpecularEnabled.value =
+        specularEnabled;
+      materialHigh.userData.shader.uniforms.uSpecularIntensity.value =
+        specularIntensity;
+      materialHigh.userData.shader.uniforms.uSpecularColor.value.copy(
+        specularColorRef.current
+      );
+      materialHigh.userData.shader.uniforms.uSpecularDirection.value
+        .set(specularDirectionX, specularDirectionY, specularDirectionZ)
+        .normalize();
+      materialHigh.userData.shader.uniforms.uGrassMiddleBrightnessMin.value =
+        grassMiddleBrightnessMin;
+      materialHigh.userData.shader.uniforms.uGrassMiddleBrightnessMax.value =
+        grassMiddleBrightnessMax;
     }
 
     // Frustum culling setup

@@ -1771,6 +1771,18 @@ export const Map1 = ({
           fogFar={claudeGrassQuick3Controls.fogFar}
           fogIntensity={claudeGrassQuick3Controls.fogIntensity}
           fogColor={claudeGrassQuick3Controls.fogColor}
+          specularEnabled={claudeGrassQuick3Controls.specularEnabled}
+          specularIntensity={claudeGrassQuick3Controls.specularIntensity}
+          specularColor={claudeGrassQuick3Controls.specularColor}
+          specularDirectionX={claudeGrassQuick3Controls.specularDirectionX}
+          specularDirectionY={claudeGrassQuick3Controls.specularDirectionY}
+          specularDirectionZ={claudeGrassQuick3Controls.specularDirectionZ}
+          grassMiddleBrightnessMin={
+            claudeGrassQuick3Controls.grassMiddleBrightnessMin
+          }
+          grassMiddleBrightnessMax={
+            claudeGrassQuick3Controls.grassMiddleBrightnessMax
+          }
         />
       )}
 
