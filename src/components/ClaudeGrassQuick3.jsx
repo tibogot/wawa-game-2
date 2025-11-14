@@ -555,6 +555,12 @@ uniform vec3 uSpecularColor;
 uniform vec3 uSpecularDirection;
 uniform float uGrassMiddleBrightnessMin;
 uniform float uGrassMiddleBrightnessMax;
+uniform bool uBackscatterEnabled;
+uniform float uBackscatterIntensity;
+uniform vec3 uBackscatterColor;
+uniform float uBackscatterPower;
+uniform float uFrontScatterStrength;
+uniform float uRimSSSStrength;
 
 // Utility functions
 // Note: saturate might be defined by Three.js, so we check and undefine if needed
@@ -727,6 +733,46 @@ void main() {
   #include <lights_fragment_begin>
   #include <lights_fragment_maps>
   #include <lights_fragment_end>
+  
+  // Custom lighting with backscatter for enhanced realism
+  if (uBackscatterEnabled) {
+    // Calculate backscatter (subsurface scattering) for translucency effect
+    // Use vViewPosition for view direction (from Three.js shader chunks)
+    vec3 viewDir = normalize(-vViewPosition);
+    // Use normal (modified by our normal mixing above) for geometry normal
+    // normal is already normalized from Three.js, just use it directly
+    
+    // Main directional light (typically sun)
+    vec3 lightDir = normalize(vec3(1.0, 1.0, 0.5));
+    
+    // Calculate backscatter - light coming through the grass from behind
+    float backScatter = max(dot(-lightDir, normal), 0.0);
+    float frontScatter = max(dot(lightDir, normal), 0.0);
+    
+    // Rim lighting for edges (translucency effect)
+    float rim = 1.0 - max(dot(normal, viewDir), 0.0);
+    rim = pow(rim, 1.5);
+    
+    // Grass thickness factor (thicker at base, thinner at tips) - heightPercent already declared above
+    float grassThickness = (1.0 - heightPercent) * 0.8 + 0.2;
+    
+    // Enhanced backscatter calculation with multiple scattering layers
+    float sssBack = pow(backScatter, uBackscatterPower) * grassThickness;
+    float sssFront = pow(frontScatter, 1.5) * grassThickness * uFrontScatterStrength;
+    float rimSSS = pow(rim, 2.0) * grassThickness * uRimSSSStrength;
+    
+    // Combine all subsurface scattering contributions
+    float totalSSS = sssBack + sssFront + rimSSS;
+    totalSSS = clamp(totalSSS, 0.0, 1.0);
+    
+    // Backscatter color (warm, slightly green-tinted for grass translucency)
+    // Original code multiplies by 0.4, so we do the same to match default behavior
+    vec3 backscatterColor = uBackscatterColor * 0.4;
+    
+    // Apply backscatter to diffuse lighting
+    vec3 backscatterContribution = backscatterColor * totalSSS * uBackscatterIntensity;
+    reflectedLight.directDiffuse += backscatterContribution;
+  }
   
   // Specular highlight (moon reflection style)
   if (uSpecularEnabled && uSpecularIntensity > 0.0) {
@@ -908,6 +954,12 @@ export default function ClaudeGrassQuick3({
   specularDirectionX = -1.0,
   specularDirectionY = 1.0,
   specularDirectionZ = 0.5,
+  backscatterEnabled = true,
+  backscatterIntensity = 0.5,
+  backscatterColor = "#51cc66",
+  backscatterPower = 2.0,
+  frontScatterStrength = 0.3,
+  rimSSSStrength = 0.5,
 }) {
   const groupRef = useRef();
   const { camera } = useThree();
@@ -929,6 +981,7 @@ export default function ClaudeGrassQuick3({
   const tipColor2Ref = useRef(convertSRGBToLinear(tipColor2));
   const fogColorRef = useRef(convertSRGBToLinear(fogColor));
   const specularColorRef = useRef(convertSRGBToLinear(specularColor));
+  const backscatterColorRef = useRef(convertSRGBToLinear(backscatterColor));
 
   // Update color refs when props change - convert to linear space
   useEffect(() => {
@@ -944,7 +997,17 @@ export default function ClaudeGrassQuick3({
     tipColor2Ref.current.copy(c4);
     fogColorRef.current.copy(fog);
     specularColorRef.current.copy(spec);
-  }, [baseColor1, baseColor2, tipColor1, tipColor2, fogColor, specularColor]);
+    const backscatter = convertSRGBToLinear(backscatterColor);
+    backscatterColorRef.current.copy(backscatter);
+  }, [
+    baseColor1,
+    baseColor2,
+    tipColor1,
+    tipColor2,
+    fogColor,
+    specularColor,
+    backscatterColor,
+  ]);
 
   // Create geometries and materials ONCE - never recreate them
   const { geometryLow, geometryHigh, materialLow, materialHigh, heightmap } =
@@ -1044,6 +1107,18 @@ export default function ClaudeGrassQuick3({
           shader.uniforms.uGrassMiddleBrightnessMax = {
             value: grassMiddleBrightnessMax,
           };
+          shader.uniforms.uBackscatterEnabled = { value: backscatterEnabled };
+          shader.uniforms.uBackscatterIntensity = {
+            value: backscatterIntensity,
+          };
+          shader.uniforms.uBackscatterColor = {
+            value: backscatterColorRef.current.clone(),
+          };
+          shader.uniforms.uBackscatterPower = { value: backscatterPower };
+          shader.uniforms.uFrontScatterStrength = {
+            value: frontScatterStrength,
+          };
+          shader.uniforms.uRimSSSStrength = { value: rimSSSStrength };
 
           // Replace shaders with complete versions
           shader.vertexShader = vertexShader;
@@ -1210,6 +1285,19 @@ export default function ClaudeGrassQuick3({
         grassMiddleBrightnessMin;
       materialLow.userData.shader.uniforms.uGrassMiddleBrightnessMax.value =
         grassMiddleBrightnessMax;
+      materialLow.userData.shader.uniforms.uBackscatterEnabled.value =
+        backscatterEnabled;
+      materialLow.userData.shader.uniforms.uBackscatterIntensity.value =
+        backscatterIntensity;
+      materialLow.userData.shader.uniforms.uBackscatterColor.value.copy(
+        backscatterColorRef.current
+      );
+      materialLow.userData.shader.uniforms.uBackscatterPower.value =
+        backscatterPower;
+      materialLow.userData.shader.uniforms.uFrontScatterStrength.value =
+        frontScatterStrength;
+      materialLow.userData.shader.uniforms.uRimSSSStrength.value =
+        rimSSSStrength;
 
       // Debug log uniforms every 60 frames
       if (Math.floor(totalTime.current * 60) % 60 === 0) {
@@ -1302,6 +1390,19 @@ export default function ClaudeGrassQuick3({
         grassMiddleBrightnessMin;
       materialHigh.userData.shader.uniforms.uGrassMiddleBrightnessMax.value =
         grassMiddleBrightnessMax;
+      materialHigh.userData.shader.uniforms.uBackscatterEnabled.value =
+        backscatterEnabled;
+      materialHigh.userData.shader.uniforms.uBackscatterIntensity.value =
+        backscatterIntensity;
+      materialHigh.userData.shader.uniforms.uBackscatterColor.value.copy(
+        backscatterColorRef.current
+      );
+      materialHigh.userData.shader.uniforms.uBackscatterPower.value =
+        backscatterPower;
+      materialHigh.userData.shader.uniforms.uFrontScatterStrength.value =
+        frontScatterStrength;
+      materialHigh.userData.shader.uniforms.uRimSSSStrength.value =
+        rimSSSStrength;
     }
 
     // Frustum culling setup

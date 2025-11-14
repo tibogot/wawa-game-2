@@ -239,6 +239,49 @@ export default function useClaudeGrassQuick3Controls() {
           { collapsed: true }
         ),
 
+        // Backscatter/SSS Controls
+        backscatter: folder(
+          {
+            backscatterEnabled: {
+              value: true,
+              label: "Enable Backscatter",
+            },
+            backscatterIntensity: {
+              value: 0.5,
+              min: 0,
+              max: 2,
+              step: 0.1,
+              label: "Backscatter Intensity",
+            },
+            backscatterColor: {
+              value: "#51cc66",
+              label: "Backscatter Color",
+            },
+            backscatterPower: {
+              value: 2.0,
+              min: 0.5,
+              max: 5,
+              step: 0.1,
+              label: "Backscatter Power",
+            },
+            frontScatterStrength: {
+              value: 0.3,
+              min: 0,
+              max: 1,
+              step: 0.1,
+              label: "Front Scatter",
+            },
+            rimSSSStrength: {
+              value: 0.5,
+              min: 0,
+              max: 1,
+              step: 0.1,
+              label: "Rim SSS Strength",
+            },
+          },
+          { collapsed: true }
+        ),
+
         // Fog Controls
         fog: folder(
           {

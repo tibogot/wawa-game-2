@@ -1783,6 +1783,12 @@ export const Map1 = ({
           grassMiddleBrightnessMax={
             claudeGrassQuick3Controls.grassMiddleBrightnessMax
           }
+          backscatterEnabled={claudeGrassQuick3Controls.backscatterEnabled}
+          backscatterIntensity={claudeGrassQuick3Controls.backscatterIntensity}
+          backscatterColor={claudeGrassQuick3Controls.backscatterColor}
+          backscatterPower={claudeGrassQuick3Controls.backscatterPower}
+          frontScatterStrength={claudeGrassQuick3Controls.frontScatterStrength}
+          rimSSSStrength={claudeGrassQuick3Controls.rimSSSStrength}
         />
       )}
 
