@@ -1725,21 +1725,9 @@ export const Map1 = ({
         )}
 
       {/* ClaudeGrassQuick3 - Quick_Grass port (New working version) */}
-      {claudeGrassQuick3Controls.enabled && (() => {
-        // Debug log
-        if (Math.random() < 0.01) { // Log 1% of frames to avoid spam
-          console.log('🌿 Map1 characterPosition:', characterPosition);
-        }
-
-        return (
-          <ClaudeGrassQuick3
-            playerPosition={
-              new THREE.Vector3(
-                characterPosition[0],
-                characterPosition[1],
-                characterPosition[2]
-              )
-            }
+      {claudeGrassQuick3Controls.enabled && (
+        <ClaudeGrassQuick3
+          playerPosition={characterPosition || [0, 0, 0]}
           terrainSize={claudeGrassQuick3Controls.terrainSize}
           heightScale={claudeGrassQuick3Controls.heightScale}
           heightOffset={claudeGrassQuick3Controls.heightOffset}
@@ -1756,12 +1744,20 @@ export const Map1 = ({
           windDirectionSpeed={claudeGrassQuick3Controls.windDirectionSpeed}
           windStrengthScale={claudeGrassQuick3Controls.windStrengthScale}
           windStrengthSpeed={claudeGrassQuick3Controls.windStrengthSpeed}
-          playerInteractionEnabled={claudeGrassQuick3Controls.playerInteractionEnabled}
-          playerInteractionRange={claudeGrassQuick3Controls.playerInteractionRange}
-          playerInteractionStrength={claudeGrassQuick3Controls.playerInteractionStrength}
+          playerInteractionEnabled={
+            claudeGrassQuick3Controls.playerInteractionEnabled
+          }
+          playerInteractionRepel={
+            claudeGrassQuick3Controls.playerInteractionRepel
+          }
+          playerInteractionRange={
+            claudeGrassQuick3Controls.playerInteractionRange
+          }
+          playerInteractionStrength={
+            claudeGrassQuick3Controls.playerInteractionStrength
+          }
         />
-        );
-      })()}
+      )}
 
       {/* GrassField6 - Claude grass system v6 (Optimized) */}
       {grassClaude6Enabled && (

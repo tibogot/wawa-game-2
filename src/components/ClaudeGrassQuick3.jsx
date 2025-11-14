@@ -231,6 +231,7 @@ uniform mat4 viewMatrixInverse;
 uniform vec4 windParams; // x: dirScale, y: dirSpeed, z: strengthScale, w: strengthSpeed
 uniform float windStrength;
 uniform vec2 playerInteractionParams; // x: range, y: strength
+uniform float playerInteractionRepel; // 1.0 for repel, -1.0 for attract
 
 attribute float vertIndex;
 
@@ -277,6 +278,9 @@ void main() {
   float windLeanAngle;
   vec3 windAxis;
   float distToPlayer;
+  float heightDiff;
+  float heightFalloff;
+  float distanceFalloff;
   float playerFalloff;
   float playerLeanAngle;
   vec3 grassToPlayer;
@@ -379,8 +383,16 @@ void main() {
 
   // Player interaction - using uniforms
   distToPlayer = distance(grassBladeWorldPos.xz, playerPos.xz);
-  playerFalloff = 1.0 - smoothstep(1.0, playerInteractionParams.x, distToPlayer);
+  heightDiff = abs(grassBladeWorldPos.y - playerPos.y);
+  // Only affect grass if player is within reasonable height range (3 units = player height + jump)
+  heightFalloff = smoothstep(3.0, 0.0, heightDiff);
+  // Distance falloff (horizontal only)
+  distanceFalloff = smoothstep(playerInteractionParams.x, 1.0, distToPlayer);
+  // Combine both falloffs - player must be both close horizontally AND at ground level
+  playerFalloff = distanceFalloff * heightFalloff;
   playerLeanAngle = mix(0.0, playerInteractionParams.y, playerFalloff * linearstep(0.5, 0.0, windLeanAngle));
+  // Apply repel/attract: repel = positive angle (bend away), attract = negative angle (bend toward)
+  playerLeanAngle *= playerInteractionRepel;
   grassToPlayer = normalize(vec3(playerPos.x, 0.0, playerPos.z) - vec3(grassBladeWorldPos.x, 0.0, grassBladeWorldPos.z));
   playerLeanAxis = vec3(grassToPlayer.z, 0.0, -grassToPlayer.x);
 
@@ -830,6 +842,7 @@ export default function ClaudeGrassQuick3({
   windStrengthScale = 0.25,
   windStrengthSpeed = 1.0,
   playerInteractionEnabled = true,
+  playerInteractionRepel = true,
   playerInteractionRange = 2.5,
   playerInteractionStrength = 0.2,
 }) {
@@ -881,7 +894,9 @@ export default function ClaudeGrassQuick3({
               windStrengthSpeed
             ),
           };
-          shader.uniforms.windStrength = { value: windEnabled ? windStrength : 0.0 };
+          shader.uniforms.windStrength = {
+            value: windEnabled ? windStrength : 0.0,
+          };
 
           // Player interaction uniforms
           shader.uniforms.playerInteractionParams = {
@@ -889,6 +904,9 @@ export default function ClaudeGrassQuick3({
               playerInteractionEnabled ? playerInteractionRange : 999.0,
               playerInteractionEnabled ? playerInteractionStrength : 0.0
             ),
+          };
+          shader.uniforms.playerInteractionRepel = {
+            value: playerInteractionRepel ? 1.0 : -1.0,
           };
 
           // Replace shaders with complete versions
@@ -921,21 +939,68 @@ export default function ClaudeGrassQuick3({
   const meshPoolHigh = useRef([]);
   const totalTime = useRef(0);
 
+  // Track player position - handle both Vector3 and array formats
+  const playerPosRef = useRef(new THREE.Vector3(0, 0, 0));
+
+  // Update player position ref when prop changes
+  useEffect(() => {
+    if (playerPosition) {
+      if (Array.isArray(playerPosition)) {
+        playerPosRef.current.set(
+          playerPosition[0] || 0,
+          playerPosition[1] || 0,
+          playerPosition[2] || 0
+        );
+      } else if (playerPosition instanceof THREE.Vector3) {
+        playerPosRef.current.copy(playerPosition);
+      } else if (playerPosition.x !== undefined) {
+        // Handle object with x, y, z properties
+        playerPosRef.current.set(
+          playerPosition.x || 0,
+          playerPosition.y || 0,
+          playerPosition.z || 0
+        );
+      }
+    }
+  }, [playerPosition]);
+
   // Update function
   useFrame((state, delta) => {
     if (!groupRef.current) return;
 
     totalTime.current += delta;
 
+    // Update player position from prop (in case it's a reactive ref/object)
+    if (playerPosition) {
+      if (Array.isArray(playerPosition)) {
+        playerPosRef.current.set(
+          playerPosition[0] || 0,
+          playerPosition[1] || 0,
+          playerPosition[2] || 0
+        );
+      } else if (playerPosition instanceof THREE.Vector3) {
+        playerPosRef.current.copy(playerPosition);
+      } else if (playerPosition.x !== undefined) {
+        playerPosRef.current.set(
+          playerPosition.x || 0,
+          playerPosition.y || 0,
+          playerPosition.z || 0
+        );
+      }
+    }
+
     // Debug player position every 60 frames
     if (Math.floor(totalTime.current * 60) % 60 === 0) {
-      console.log('🌿 ClaudeGrassQuick3 playerPosition:', playerPosition);
+      console.log("🌿 ClaudeGrassQuick3 playerPosition prop:", playerPosition);
+      console.log("🌿 ClaudeGrassQuick3 playerPosRef:", playerPosRef.current);
     }
 
     // Update shader uniforms
     if (materialLow.userData.shader) {
       materialLow.userData.shader.uniforms.time.value = totalTime.current;
-      materialLow.userData.shader.uniforms.playerPos.value.copy(playerPosition);
+      materialLow.userData.shader.uniforms.playerPos.value.copy(
+        playerPosRef.current
+      );
       materialLow.userData.shader.uniforms.viewMatrixInverse.value =
         camera.matrixWorld;
       // Update control-based uniforms
@@ -959,27 +1024,34 @@ export default function ClaudeGrassQuick3({
         windStrengthScale,
         windStrengthSpeed
       );
-      materialLow.userData.shader.uniforms.windStrength.value = windEnabled ? windStrength : 0.0;
+      materialLow.userData.shader.uniforms.windStrength.value = windEnabled
+        ? windStrength
+        : 0.0;
       // Update player interaction uniforms
       materialLow.userData.shader.uniforms.playerInteractionParams.value.set(
         playerInteractionEnabled ? playerInteractionRange : 999.0,
         playerInteractionEnabled ? playerInteractionStrength : 0.0
       );
+      materialLow.userData.shader.uniforms.playerInteractionRepel.value =
+        playerInteractionRepel ? 1.0 : -1.0;
 
       // Debug log uniforms every 60 frames
       if (Math.floor(totalTime.current * 60) % 60 === 0) {
-        console.log('🌿 Shader uniforms:', {
+        console.log("🌿 Shader uniforms:", {
           playerPos: materialLow.userData.shader.uniforms.playerPos.value,
-          playerInteractionParams: materialLow.userData.shader.uniforms.playerInteractionParams.value,
+          playerInteractionParams:
+            materialLow.userData.shader.uniforms.playerInteractionParams.value,
           playerInteractionEnabled,
           playerInteractionRange,
-          playerInteractionStrength
+          playerInteractionStrength,
         });
       }
     }
     if (materialHigh.userData.shader) {
       materialHigh.userData.shader.uniforms.time.value = totalTime.current;
-      materialHigh.userData.shader.uniforms.playerPos.value.copy(playerPosition);
+      materialHigh.userData.shader.uniforms.playerPos.value.copy(
+        playerPosRef.current
+      );
       materialHigh.userData.shader.uniforms.viewMatrixInverse.value =
         camera.matrixWorld;
       // Update control-based uniforms
@@ -1003,12 +1075,16 @@ export default function ClaudeGrassQuick3({
         windStrengthScale,
         windStrengthSpeed
       );
-      materialHigh.userData.shader.uniforms.windStrength.value = windEnabled ? windStrength : 0.0;
+      materialHigh.userData.shader.uniforms.windStrength.value = windEnabled
+        ? windStrength
+        : 0.0;
       // Update player interaction uniforms
       materialHigh.userData.shader.uniforms.playerInteractionParams.value.set(
         playerInteractionEnabled ? playerInteractionRange : 999.0,
         playerInteractionEnabled ? playerInteractionStrength : 0.0
       );
+      materialHigh.userData.shader.uniforms.playerInteractionRepel.value =
+        playerInteractionRepel ? 1.0 : -1.0;
     }
 
     // Frustum culling setup
