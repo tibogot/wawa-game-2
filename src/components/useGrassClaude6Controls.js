@@ -10,7 +10,7 @@ export function useGrassClaude6Controls() {
           label: "🌿 Enable Grass Claude 6",
         },
         grassHeight: {
-          value: 1,
+          value: 0.8,
           min: 0.5,
           max: 5.0,
           step: 0.1,
@@ -57,6 +57,10 @@ export function useGrassClaude6Controls() {
           max: 0.5,
           step: 0.01,
           label: "📐 Grass Width",
+        },
+        lodEnabled: {
+          value: true,
+          label: "🎚️ Enable LOD (false = all high LOD)",
         },
         lodDistance: {
           value: 15,
@@ -158,7 +162,8 @@ export function useGrassClaude6Controls() {
           {
             normalMixEnabled: {
               value: false,
-              label: "Enable Normal Mixing (false = per-side variation like GrassClaude2)",
+              label:
+                "Enable Normal Mixing (false = per-side variation like GrassClaude2)",
             },
             normalMixFactor: {
               value: 0.5,

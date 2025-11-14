@@ -246,6 +246,8 @@ varying vec4 vGrassParams;
 varying vec3 vNormal2;
 varying vec3 vWorldPosition;
 varying float vFogDepth;
+varying float vLODEnabledDebug; // Debug: pass uLODEnabled to fragment shader
+varying float vWidthFactorDebug; // Debug: pass actual width factor to fragment shader
 
 uniform vec2 grassSize;
 uniform vec4 grassParams;
@@ -256,6 +258,7 @@ uniform vec4 heightParams;
 uniform vec3 playerPos;
 uniform mat4 viewMatrixInverse;
 uniform vec3 uCameraPosition; // Explicit camera position for accurate LOD calculation
+uniform float uLODEnabled; // Enable/disable LOD system (1.0 = enabled, 0.0 = disabled)
 
 // Grass color uniforms
 uniform vec3 uBaseColor1;
@@ -305,7 +308,11 @@ void main() {
   // FIXED: Hard cutoff for LOD - close grass is always high LOD (curved), far grass is low LOD (linear)
   // Use explicit camera position uniform for accurate, always-updated LOD calculation
   // step returns 0.0 if distance < lodDistance (high LOD), 1.0 if distance >= lodDistance (low LOD)
-  float highLODOut = step(grassDraw.x, distance(uCameraPosition, grassBladeWorldPos));
+  // If LOD is disabled (uLODEnabled < 0.5), force all blades to high LOD (highLODOut = 0.0)
+  // Use explicit comparison and clamp to ensure it's definitely 0.0 when disabled
+  float lodEnabledCheck = step(0.5, uLODEnabled); // 1.0 if enabled, 0.0 if disabled
+  float distanceBasedLOD = step(grassDraw.x, distance(uCameraPosition, grassBladeWorldPos));
+  float highLODOut = mix(0.0, distanceBasedLOD, lodEnabledCheck); // When disabled (lodEnabledCheck=0.0), always returns 0.0
   // Disable distance-based culling - always show grass regardless of distance
   float lodFadeIn = 0.0; // smoothstep(grassDraw.x, grassDraw.y, distance(uCameraPosition, grassBladeWorldPos));
 
@@ -420,6 +427,10 @@ void main() {
   vec3 lowLODColour = mix(b1, t1, lowLODGradient);
   vGrassColour = mix(highLODColour, lowLODColour, highLODOut);
   vGrassParams = vec4(heightPercent, grassBladeWorldPos.y, highLODOut, xSide);
+  vLODEnabledDebug = uLODEnabled; // Debug: pass uniform value to fragment shader
+  // Store actual width factor for debugging: shows the width gradient (0.0 = tip, 1.0 = base)
+  float actualWidthFactor = mix(grassTotalWidthHigh, grassTotalWidthLow, highLODOut);
+  vWidthFactorDebug = actualWidthFactor;
   
   const float SKY_RATIO = 0.25;
   vec3 UP = vec3(0.0, 1.0, 0.0);
@@ -527,6 +538,8 @@ varying vec4 vGrassParams;
 varying vec3 vNormal2;
 varying vec3 vWorldPosition;
 varying float vFogDepth;
+varying float vLODEnabledDebug; // Debug: uLODEnabled value from vertex shader
+varying float vWidthFactorDebug; // Debug: actual width factor from vertex shader
 // vViewPosition is provided by Three.js shader chunks, don't declare it here
 
 // Fog uniforms
@@ -593,6 +606,7 @@ void main() {
     diffuseColor.rgb = debugColor;
   }
   
+  
   // Grass middle calculation - creates more variation in blade appearance
   float grassMiddle = mix(
     smoothstep(abs(vGrassParams.w - 0.5), 0.0, 0.1), 1.0, lodFadeIn
@@ -629,31 +643,34 @@ void main() {
   
   // Mix normals for more 3D appearance - using normal (from Three.js) and vNormal2 (custom)
   // normal is already provided by Three.js after normal_fragment_maps
-  // IMPORTANT: Use vGrassParams.w (xSide) by default to create per-side normal variation
-  // This makes each side of the blade have a different normal, creating the 3D effect
+  // Smooth gradient approach: xSide (vGrassParams.w) interpolates smoothly from 0.0 to 1.0 across blade width
+  // This creates a smooth gradient of normals from left to right, not a hard switch
   vec3 baseNormal = normalize(normal);
   vec3 normal2 = normalize(vNormal2);
-  // xSide alternates between 0.0 and 1.0 for left/right vertices, creating the 3D look
-  float mixFactor = uNormalMixEnabled ? uNormalMixFactor : vGrassParams.w;
-  // When uNormalMixEnabled is false, use xSide (like GrassClaude2) for per-side variation
-  // When enabled, uNormalMixFactor can override (0.5 = uniform blend, but loses 3D effect)
+  
+  // widthPercent: smoothly interpolated from 0.0 (left edge) to 1.0 (right edge) across the blade width
+  // This is achieved through vertex interpolation of xSide (0.0 at left vertices, 1.0 at right vertices)
+  float widthPercent = vGrassParams.w; // xSide interpolates smoothly across the triangle
+  
+  // Use widthPercent for smooth normal gradient (like the image code)
+  float mixFactor = uNormalMixEnabled ? uNormalMixFactor : widthPercent;
+  
+  // Mix the two normals based on width position - creates smooth gradient across blade width
   normal = normalize(mix(baseNormal, normal2, mixFactor));
   
-  // Calculate debug normal color if enabled
+  // TEMPORARY DEBUG: Visualize actual width factor to see the width gradient
+  // White = full width (base, 1.0), Black = no width (tip, 0.0)
+  // This shows the actual width gradient across each blade
+  // Curved blades (easeOut) should stay wider longer in the middle
+  // Linear blades should have constant taper
   if (isDebugNormals) {
-    vec3 n = normal;
-    
-    // Map X and Z components directly to Red and Blue (these show the variation)
-    // Suppress Y (green) since it's always high and not informative
-    debugNormalColor.r = n.x * 0.5 + 0.5; // Red = X component (left/right)
-    debugNormalColor.b = n.z * 0.5 + 0.5; // Blue = Z component (forward/back)
-    debugNormalColor.g = 0.1; // Minimal green (Y is always up, not informative)
-    
-    // Dramatically enhance X and Z contrast to make variation visible
-    debugNormalColor.r = (debugNormalColor.r - 0.5) * 5.0 + 0.5; // Much more contrast for X
-    debugNormalColor.b = (debugNormalColor.b - 0.5) * 5.0 + 0.5; // Much more contrast for Z
-    
-    debugNormalColor = clamp(debugNormalColor, 0.0, 1.0);
+    // vWidthFactorDebug stores the actual width factor (0.0 = tip, 1.0 = base)
+    // This is the result of mix(grassTotalWidthHigh, grassTotalWidthLow, highLODOut)
+    float actualWidthFactor = vWidthFactorDebug;
+    // Visualize: White = full width (1.0), Black = no width (0.0)
+    // This will show the width gradient - curved blades should have a different gradient than linear
+    vec3 widthDebugColor = vec3(actualWidthFactor);
+    debugNormalColor = widthDebugColor;
   }
   
   #include <emissivemap_fragment>
@@ -835,6 +852,7 @@ export function GrassPatch({
   grassHeight = 1.5, // Height of grass blades
   lodDistance = 15, // Distance to switch to low LOD
   maxDistance = 100, // Max render distance
+  lodEnabled = true, // Enable/disable LOD system (false = all blades use high LOD)
   heightmap = null, // Optional heightmap texture
   terrainHeight = 10, // Terrain height scale
   terrainOffset = 0, // Terrain offset
@@ -897,6 +915,7 @@ export function GrassPatch({
 
   // Track previous uniform values to avoid unnecessary updates
   const prevUniformsRef = useRef({
+    lodEnabled: lodEnabled,
     fogEnabled: fogEnabled,
     fogNear: fogNear,
     fogFar: fogFar,
@@ -986,6 +1005,11 @@ export function GrassPatch({
       shader.uniforms.grassDraw = {
         value: new THREE.Vector4(lodDistance, maxDistance, 0, 0),
       };
+      // CRITICAL: Set uLODEnabled BEFORE shader compiles to ensure it's available
+      shader.uniforms.uLODEnabled = { value: lodEnabled ? 1.0 : 0.0 };
+      console.log(
+        `🔧 Shader compiling with uLODEnabled = ${lodEnabled ? 1.0 : 0.0}`
+      );
       shader.uniforms.heightmap = { value: heightmap };
       shader.uniforms.heightParams = {
         value: new THREE.Vector4(terrainSize, 0, 0, 0),
@@ -1086,6 +1110,7 @@ export function GrassPatch({
     grassHeight,
     lodDistance,
     maxDistance,
+    lodEnabled,
     heightmap,
     terrainHeight,
     terrainOffset,
@@ -1172,6 +1197,24 @@ export function GrassPatch({
     shader.uniforms.viewMatrixInverse.value.copy(state.camera.matrixWorld);
     // Update camera position for accurate LOD calculation - always update to ensure it's current
     shader.uniforms.uCameraPosition.value.copy(state.camera.position);
+
+    // Update LOD enabled - always update to ensure it's current
+    // Use float (1.0 or 0.0) instead of bool for better GLSL compatibility
+    const lodEnabledFloat = lodEnabled ? 1.0 : 0.0;
+    if (prev.lodEnabled !== lodEnabled) {
+      shader.uniforms.uLODEnabled.value = lodEnabledFloat;
+      prev.lodEnabled = lodEnabled;
+      // Force material update when LOD is toggled
+      materialRef.current.needsUpdate = true;
+      console.log(
+        `🌿 LOD ${lodEnabled ? "ENABLED" : "DISABLED"} - All blades should be ${
+          lodEnabled ? "mixed LOD" : "HIGH LOD only"
+        } - Uniform set to ${lodEnabledFloat}`
+      );
+    } else {
+      // Always set the value to ensure it's current
+      shader.uniforms.uLODEnabled.value = lodEnabledFloat;
+    }
 
     // Player position - only update if provided and changed
     if (playerPosition) {

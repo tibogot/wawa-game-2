@@ -9,6 +9,8 @@ import { GrassField } from "./GrassClaude2";
 import { GrassField as GrassField3 } from "./GrassClaude3";
 import { GrassField as GrassField4 } from "./GrassClaude4";
 import { GrassField as GrassField6 } from "./GrassClaude6";
+import { GrassField as GrassField7 } from "./GrassClaude7";
+import ClaudeGrassQuick from "./ClaudeGrassQuick";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
@@ -19,6 +21,8 @@ import { useGrassClaudeControls } from "./useGrassClaudeControls";
 import { useGrassClaude3Controls } from "./useGrassClaude3Controls";
 import { useGrassClaude4Controls } from "./useGrassClaude4Controls";
 import { useGrassClaude6Controls } from "./useGrassClaude6Controls";
+import { useGrassClaude7Controls } from "./useGrassClaude7Controls";
+import useClaudeGrassQuickControls from "./useClaudeGrassQuickControls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
@@ -227,6 +231,7 @@ export const Map1 = ({
     numGrass: numGrass6,
     patchSize: patchSize6,
     grassWidth: grassWidth6,
+    lodEnabled: lodEnabled6,
     lodDistance: lodDistance6,
     maxDistance: maxDistance6,
     baseColor1: baseColor1_6,
@@ -270,6 +275,12 @@ export const Map1 = ({
     fogColor: fogColor6,
     fogIntensity: fogIntensity6,
   } = useGrassClaude6Controls();
+
+  // Get GrassClaude7 controls
+  const { grassClaude7Enabled } = useGrassClaude7Controls();
+
+  // Get ClaudeGrassQuick controls
+  const claudeGrassQuickControls = useClaudeGrassQuickControls();
 
   // Get ImpostorForest controls
   const {
@@ -1623,8 +1634,40 @@ export const Map1 = ({
         />
       )}
 
+      {/* GrassField7 - Claude grass system v7 */}
+      {grassClaude7Enabled && (
+        <GrassField7
+          gridSize={5}
+          patchSpacing={10}
+          centerPosition={[0, 0, 0]}
+          playerPosition={characterPosition}
+          renderDistance={80}
+          patchSize={10}
+          numGrass={32 * 32 * 3}
+          segments={6}
+          grassWidth={0.1}
+          grassHeight={0.65}
+        />
+      )}
+
+      {/* ClaudeGrassQuick - Quick_Grass port with advanced shaders */}
+      {claudeGrassQuickControls.enabled && (
+        <ClaudeGrassQuick
+          playerPosition={
+            new THREE.Vector3(
+              characterPosition[0],
+              characterPosition[1],
+              characterPosition[2]
+            )
+          }
+          terrainSize={claudeGrassQuickControls.terrainSize}
+          heightScale={claudeGrassQuickControls.heightScale}
+          heightOffset={claudeGrassQuickControls.heightOffset}
+        />
+      )}
+
       {/* GrassField6 - Claude grass system v6 (Optimized) */}
-      {grassClaude6Enabled && (
+      {false && grassClaude6Enabled && (
         <GrassField6
           gridSize={gridSize6}
           patchSpacing={patchSpacing6}
@@ -1635,6 +1678,7 @@ export const Map1 = ({
           patchSize={patchSize6}
           grassWidth={grassWidth6}
           grassHeight={grassHeight6}
+          lodEnabled={lodEnabled6}
           lodDistance={lodDistance6}
           maxDistance={maxDistance6}
           baseColor1={baseColor1_6}
