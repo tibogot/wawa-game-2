@@ -12,6 +12,7 @@ import { GrassField as GrassField6 } from "./GrassClaude6";
 import { GrassField as GrassField7 } from "./GrassClaude7";
 import ClaudeGrassQuick from "./ClaudeGrassQuick";
 import ClaudeGrassQuick2 from "./ClaudeGrassQuick2";
+import ClaudeGrassQuick3 from "./ClaudeGrassQuick3";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
@@ -25,6 +26,7 @@ import { useGrassClaude6Controls } from "./useGrassClaude6Controls";
 import { useGrassClaude7Controls } from "./useGrassClaude7Controls";
 import useClaudeGrassQuickControls from "./useClaudeGrassQuickControls";
 import useClaudeGrassQuick2Controls from "./useClaudeGrassQuick2Controls";
+import useClaudeGrassQuick3Controls from "./useClaudeGrassQuick3Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
@@ -286,6 +288,8 @@ export const Map1 = ({
   // Get ClaudeGrassQuick2 controls
   // Leva flattens folder structure - all properties are at top level
   const claudeGrassQuick2Controls = useClaudeGrassQuick2Controls();
+  // Get ClaudeGrassQuick3 controls
+  const claudeGrassQuick3Controls = useClaudeGrassQuick3Controls();
 
   // Debug: log controls to see if they're updating
   useEffect(() => {
@@ -1683,6 +1687,11 @@ export const Map1 = ({
           terrainSize={claudeGrassQuickControls.terrainSize}
           heightScale={claudeGrassQuickControls.heightScale}
           heightOffset={claudeGrassQuickControls.heightOffset}
+          grassWidth={claudeGrassQuickControls.grassWidth}
+          grassHeight={claudeGrassQuickControls.grassHeight}
+          lodDistance={claudeGrassQuickControls.lodDistance}
+          maxDistance={claudeGrassQuickControls.maxDistance}
+          patchSize={claudeGrassQuickControls.patchSize}
         />
       )}
 
@@ -1715,8 +1724,47 @@ export const Map1 = ({
           />
         )}
 
+      {/* ClaudeGrassQuick3 - Quick_Grass port (New working version) */}
+      {claudeGrassQuick3Controls.enabled && (() => {
+        // Debug log
+        if (Math.random() < 0.01) { // Log 1% of frames to avoid spam
+          console.log('🌿 Map1 characterPosition:', characterPosition);
+        }
+
+        return (
+          <ClaudeGrassQuick3
+            playerPosition={
+              new THREE.Vector3(
+                characterPosition[0],
+                characterPosition[1],
+                characterPosition[2]
+              )
+            }
+          terrainSize={claudeGrassQuick3Controls.terrainSize}
+          heightScale={claudeGrassQuick3Controls.heightScale}
+          heightOffset={claudeGrassQuick3Controls.heightOffset}
+          grassWidth={claudeGrassQuick3Controls.grassWidth}
+          grassHeight={claudeGrassQuick3Controls.grassHeight}
+          lodDistance={claudeGrassQuick3Controls.lodDistance}
+          maxDistance={claudeGrassQuick3Controls.maxDistance}
+          patchSize={claudeGrassQuick3Controls.patchSize}
+          gridSize={claudeGrassQuick3Controls.gridSize}
+          patchSpacing={claudeGrassQuick3Controls.patchSpacing}
+          windEnabled={claudeGrassQuick3Controls.windEnabled}
+          windStrength={claudeGrassQuick3Controls.windStrength}
+          windDirectionScale={claudeGrassQuick3Controls.windDirectionScale}
+          windDirectionSpeed={claudeGrassQuick3Controls.windDirectionSpeed}
+          windStrengthScale={claudeGrassQuick3Controls.windStrengthScale}
+          windStrengthSpeed={claudeGrassQuick3Controls.windStrengthSpeed}
+          playerInteractionEnabled={claudeGrassQuick3Controls.playerInteractionEnabled}
+          playerInteractionRange={claudeGrassQuick3Controls.playerInteractionRange}
+          playerInteractionStrength={claudeGrassQuick3Controls.playerInteractionStrength}
+        />
+        );
+      })()}
+
       {/* GrassField6 - Claude grass system v6 (Optimized) */}
-      {false && grassClaude6Enabled && (
+      {grassClaude6Enabled && (
         <GrassField6
           gridSize={gridSize6}
           patchSpacing={patchSpacing6}

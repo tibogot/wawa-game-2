@@ -228,6 +228,9 @@ uniform sampler2D heightmap;
 uniform vec4 heightParams;
 uniform vec3 playerPos;
 uniform mat4 viewMatrixInverse;
+uniform vec4 windParams; // x: dirScale, y: dirSpeed, z: strengthScale, w: strengthSpeed
+uniform float windStrength;
+uniform vec2 playerInteractionParams; // x: range, y: strength
 
 attribute float vertIndex;
 
@@ -366,18 +369,18 @@ void main() {
   x = (xSide - 0.5) * grassTotalWidth;
   y = heightPercent * grassTotalHeight;
 
-  // Wind
-  windDir = noise12(grassBladeWorldPos.xz * 0.05 + 0.05 * time);
-  windNoiseSample = noise12(grassBladeWorldPos.xz * 0.25 + time * 1.0);
+  // Wind - using uniforms
+  windDir = noise12(grassBladeWorldPos.xz * windParams.x + windParams.y * time);
+  windNoiseSample = noise12(grassBladeWorldPos.xz * windParams.z + time * windParams.w);
   windLeanAngle = remap(windNoiseSample, -1.0, 1.0, 0.25, 1.0);
-  windLeanAngle = easeIn(windLeanAngle, 2.0) * 1.25;
+  windLeanAngle = easeIn(windLeanAngle, 2.0) * windStrength;
   windAxis = vec3(cos(windDir), 0.0, sin(windDir));
   windLeanAngle *= heightPercent;
 
-  // Player interaction
+  // Player interaction - using uniforms
   distToPlayer = distance(grassBladeWorldPos.xz, playerPos.xz);
-  playerFalloff = smoothstep(2.5, 1.0, distToPlayer);
-  playerLeanAngle = mix(0.0, 0.2, playerFalloff * linearstep(0.5, 0.0, windLeanAngle));
+  playerFalloff = 1.0 - smoothstep(1.0, playerInteractionParams.x, distToPlayer);
+  playerLeanAngle = mix(0.0, playerInteractionParams.y, playerFalloff * linearstep(0.5, 0.0, windLeanAngle));
   grassToPlayer = normalize(vec3(playerPos.x, 0.0, playerPos.z) - vec3(grassBladeWorldPos.x, 0.0, grassBladeWorldPos.z));
   playerLeanAxis = vec3(grassToPlayer.z, 0.0, -grassToPlayer.x);
 
@@ -808,7 +811,7 @@ function createHeightmap() {
 }
 
 // Main component
-export default function ClaudeGrassFixed({
+export default function ClaudeGrassQuick3({
   playerPosition = new THREE.Vector3(0, 0, 0),
   terrainSize = 100,
   heightScale = 1,
@@ -818,6 +821,17 @@ export default function ClaudeGrassFixed({
   lodDistance = 15,
   maxDistance = 100,
   patchSize = 10,
+  gridSize = 16,
+  patchSpacing = 10,
+  windEnabled = true,
+  windStrength = 1.25,
+  windDirectionScale = 0.05,
+  windDirectionSpeed = 0.05,
+  windStrengthScale = 0.25,
+  windStrengthSpeed = 1.0,
+  playerInteractionEnabled = true,
+  playerInteractionRange = 2.5,
+  playerInteractionStrength = 0.2,
 }) {
   const groupRef = useRef();
   const { camera } = useThree();
@@ -844,7 +858,7 @@ export default function ClaudeGrassFixed({
               segments,
               vertices,
               1, // heightScale - will be updated via useEffect
-              0  // heightOffset - will be updated via useEffect
+              0 // heightOffset - will be updated via useEffect
             ),
           };
           shader.uniforms.grassDraw = {
@@ -857,6 +871,25 @@ export default function ClaudeGrassFixed({
           };
           shader.uniforms.playerPos = { value: new THREE.Vector3(0, 0, 0) };
           shader.uniforms.viewMatrixInverse = { value: new THREE.Matrix4() };
+
+          // Wind uniforms
+          shader.uniforms.windParams = {
+            value: new THREE.Vector4(
+              windDirectionScale,
+              windDirectionSpeed,
+              windStrengthScale,
+              windStrengthSpeed
+            ),
+          };
+          shader.uniforms.windStrength = { value: windEnabled ? windStrength : 0.0 };
+
+          // Player interaction uniforms
+          shader.uniforms.playerInteractionParams = {
+            value: new THREE.Vector2(
+              playerInteractionEnabled ? playerInteractionRange : 999.0,
+              playerInteractionEnabled ? playerInteractionStrength : 0.0
+            ),
+          };
 
           // Replace shaders with complete versions
           shader.vertexShader = vertexShader;
@@ -894,30 +927,88 @@ export default function ClaudeGrassFixed({
 
     totalTime.current += delta;
 
+    // Debug player position every 60 frames
+    if (Math.floor(totalTime.current * 60) % 60 === 0) {
+      console.log('🌿 ClaudeGrassQuick3 playerPosition:', playerPosition);
+    }
+
     // Update shader uniforms
     if (materialLow.userData.shader) {
       materialLow.userData.shader.uniforms.time.value = totalTime.current;
-      materialLow.userData.shader.uniforms.playerPos.value = playerPosition;
+      materialLow.userData.shader.uniforms.playerPos.value.copy(playerPosition);
       materialLow.userData.shader.uniforms.viewMatrixInverse.value =
         camera.matrixWorld;
       // Update control-based uniforms
-      materialLow.userData.shader.uniforms.grassSize.value.set(grassWidth, grassHeight);
+      materialLow.userData.shader.uniforms.grassSize.value.set(
+        grassWidth,
+        grassHeight
+      );
       materialLow.userData.shader.uniforms.grassParams.value.z = heightScale;
       materialLow.userData.shader.uniforms.grassParams.value.w = heightOffset;
-      materialLow.userData.shader.uniforms.grassDraw.value.set(lodDistance, maxDistance, 0, 0);
+      materialLow.userData.shader.uniforms.grassDraw.value.set(
+        lodDistance,
+        maxDistance,
+        0,
+        0
+      );
       materialLow.userData.shader.uniforms.heightParams.value.x = terrainSize;
+      // Update wind uniforms
+      materialLow.userData.shader.uniforms.windParams.value.set(
+        windDirectionScale,
+        windDirectionSpeed,
+        windStrengthScale,
+        windStrengthSpeed
+      );
+      materialLow.userData.shader.uniforms.windStrength.value = windEnabled ? windStrength : 0.0;
+      // Update player interaction uniforms
+      materialLow.userData.shader.uniforms.playerInteractionParams.value.set(
+        playerInteractionEnabled ? playerInteractionRange : 999.0,
+        playerInteractionEnabled ? playerInteractionStrength : 0.0
+      );
+
+      // Debug log uniforms every 60 frames
+      if (Math.floor(totalTime.current * 60) % 60 === 0) {
+        console.log('🌿 Shader uniforms:', {
+          playerPos: materialLow.userData.shader.uniforms.playerPos.value,
+          playerInteractionParams: materialLow.userData.shader.uniforms.playerInteractionParams.value,
+          playerInteractionEnabled,
+          playerInteractionRange,
+          playerInteractionStrength
+        });
+      }
     }
     if (materialHigh.userData.shader) {
       materialHigh.userData.shader.uniforms.time.value = totalTime.current;
-      materialHigh.userData.shader.uniforms.playerPos.value = playerPosition;
+      materialHigh.userData.shader.uniforms.playerPos.value.copy(playerPosition);
       materialHigh.userData.shader.uniforms.viewMatrixInverse.value =
         camera.matrixWorld;
       // Update control-based uniforms
-      materialHigh.userData.shader.uniforms.grassSize.value.set(grassWidth, grassHeight);
+      materialHigh.userData.shader.uniforms.grassSize.value.set(
+        grassWidth,
+        grassHeight
+      );
       materialHigh.userData.shader.uniforms.grassParams.value.z = heightScale;
       materialHigh.userData.shader.uniforms.grassParams.value.w = heightOffset;
-      materialHigh.userData.shader.uniforms.grassDraw.value.set(lodDistance, maxDistance, 0, 0);
+      materialHigh.userData.shader.uniforms.grassDraw.value.set(
+        lodDistance,
+        maxDistance,
+        0,
+        0
+      );
       materialHigh.userData.shader.uniforms.heightParams.value.x = terrainSize;
+      // Update wind uniforms
+      materialHigh.userData.shader.uniforms.windParams.value.set(
+        windDirectionScale,
+        windDirectionSpeed,
+        windStrengthScale,
+        windStrengthSpeed
+      );
+      materialHigh.userData.shader.uniforms.windStrength.value = windEnabled ? windStrength : 0.0;
+      // Update player interaction uniforms
+      materialHigh.userData.shader.uniforms.playerInteractionParams.value.set(
+        playerInteractionEnabled ? playerInteractionRange : 999.0,
+        playerInteractionEnabled ? playerInteractionStrength : 0.0
+      );
     }
 
     // Frustum culling setup
@@ -929,11 +1020,11 @@ export default function ClaudeGrassFixed({
     );
     frustum.setFromProjectionMatrix(projScreenMatrix);
 
-    // Calculate base cell position
+    // Calculate base cell position using patchSpacing
     const baseCellPos = camera.position.clone();
-    baseCellPos.divideScalar(GRASS_PATCH_SIZE);
+    baseCellPos.divideScalar(patchSpacing);
     baseCellPos.floor();
-    baseCellPos.multiplyScalar(GRASS_PATCH_SIZE);
+    baseCellPos.multiplyScalar(patchSpacing);
 
     // Hide all meshes
     groupRef.current.children.forEach((child) => {
@@ -950,18 +1041,18 @@ export default function ClaudeGrassFixed({
     );
     const aabbTmp = new THREE.Box3();
 
-    // Grid of patches around camera
-    for (let x = -16; x < 16; x++) {
-      for (let z = -16; z < 16; z++) {
+    // Grid of patches around camera using gridSize
+    for (let x = -gridSize; x < gridSize; x++) {
+      for (let z = -gridSize; z < gridSize; z++) {
         const currentCell = new THREE.Vector3(
-          baseCellPos.x + x * GRASS_PATCH_SIZE,
+          baseCellPos.x + x * patchSpacing,
           0,
-          baseCellPos.z + z * GRASS_PATCH_SIZE
+          baseCellPos.z + z * patchSpacing
         );
 
         aabbTmp.setFromCenterAndSize(
           currentCell,
-          new THREE.Vector3(GRASS_PATCH_SIZE, 1000, GRASS_PATCH_SIZE)
+          new THREE.Vector3(patchSpacing, 1000, patchSpacing)
         );
 
         const distToCell = aabbTmp.distanceToPoint(cameraPosXZ);
