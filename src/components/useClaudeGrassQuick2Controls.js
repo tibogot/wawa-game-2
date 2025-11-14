@@ -87,19 +87,26 @@ export default function useClaudeGrassQuick2Controls() {
               value: false,
               label: "Enable Specular / Moon Reflection",
             },
-            lightAzimuth: {
-              value: 225,
-              min: 0,
-              max: 360,
-              step: 1,
-              label: "Light Azimuth (deg)",
+            lightDirectionX: {
+              value: 1.0,
+              min: -5.0,
+              max: 5.0,
+              step: 0.1,
+              label: "Light Direction X",
             },
-            lightElevation: {
-              value: 45,
-              min: 0,
-              max: 90,
-              step: 1,
-              label: "Light Elevation (deg)",
+            lightDirectionY: {
+              value: 1.0,
+              min: -5.0,
+              max: 5.0,
+              step: 0.1,
+              label: "Light Direction Y",
+            },
+            lightDirectionZ: {
+              value: 0.5,
+              min: -5.0,
+              max: 5.0,
+              step: 0.1,
+              label: "Light Direction Z",
             },
             specularColor: {
               value: { r: 0.9, g: 0.95, b: 1.0 },

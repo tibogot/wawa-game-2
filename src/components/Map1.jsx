@@ -287,6 +287,21 @@ export const Map1 = ({
   // Leva flattens folder structure - all properties are at top level
   const claudeGrassQuick2Controls = useClaudeGrassQuick2Controls();
 
+  // Debug: log controls to see if they're updating
+  useEffect(() => {
+    if (claudeGrassQuick2Controls) {
+      console.log("🌿 Map1 - claudeGrassQuick2Controls:", {
+        lightDirectionX: claudeGrassQuick2Controls.lightDirectionX,
+        lightDirectionY: claudeGrassQuick2Controls.lightDirectionY,
+        lightDirectionZ: claudeGrassQuick2Controls.lightDirectionZ,
+      });
+    }
+  }, [
+    claudeGrassQuick2Controls?.lightDirectionX,
+    claudeGrassQuick2Controls?.lightDirectionY,
+    claudeGrassQuick2Controls?.lightDirectionZ,
+  ]);
+
   // Get ImpostorForest controls
   const {
     impostorForestEnabled,
@@ -1691,8 +1706,9 @@ export const Map1 = ({
             maxDistance={claudeGrassQuick2Controls.maxDistance}
             patchSize={claudeGrassQuick2Controls.patchSize}
             specularEnabled={claudeGrassQuick2Controls.specularEnabled}
-            lightAzimuth={claudeGrassQuick2Controls.lightAzimuth}
-            lightElevation={claudeGrassQuick2Controls.lightElevation}
+            lightDirectionX={claudeGrassQuick2Controls.lightDirectionX}
+            lightDirectionY={claudeGrassQuick2Controls.lightDirectionY}
+            lightDirectionZ={claudeGrassQuick2Controls.lightDirectionZ}
             specularColor={claudeGrassQuick2Controls.specularColor}
             specularIntensity={claudeGrassQuick2Controls.specularIntensity}
             shininess={claudeGrassQuick2Controls.shininess}

@@ -700,16 +700,15 @@ void main() {
   #include <aomap_fragment>
   
   // Add custom specular highlight using custom light direction (moon reflection)
+  // Always calculate specular (control via customSpecularIntensity uniform - set to 0 to disable)
   vec3 customSpecular = vec3(0.0);
-  #ifdef CUSTOM_SPECULAR_ENABLED
-    vec3 viewDirNormalized = normalize(viewDir);
-    vec3 lightDirNormalized = normalize(customLightDirection);
-    vec3 halfVector = normalize(viewDirNormalized + lightDirNormalized);
-    float NdotH = max(dot(normal, halfVector), 0.0);
-    float specularPower = pow(NdotH, shininess);
-    float NdotL = max(dot(normal, lightDirNormalized), 0.0);
-    customSpecular = customSpecularColor * specularPower * NdotL * customSpecularIntensity;
-  #endif
+  // Use same calculation as GrassClaude5 for consistency
+  // Note: viewDir is already declared in main(), so use specularViewDir to avoid redefinition
+  vec3 specularViewDir = normalize(-vViewPosition);
+  vec3 lightDir = normalize(customLightDirection);
+  vec3 reflectDir = reflect(-lightDir, normal);
+  float spec = pow(max(dot(specularViewDir, reflectDir), 0.0), shininess);
+  customSpecular = customSpecularColor * spec * customSpecularIntensity;
   
   outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance + customSpecular;
 
@@ -834,8 +833,9 @@ export default function ClaudeGrassQuick2({
   maxDistance = GRASS_MAX_DIST,
   patchSize = GRASS_PATCH_SIZE,
   specularEnabled = false,
-  lightAzimuth = 225,
-  lightElevation = 45,
+  lightDirectionX = 1.0,
+  lightDirectionY = 1.0,
+  lightDirectionZ = 0.5,
   specularColor = { r: 0.9, g: 0.95, b: 1.0 },
   specularIntensity = 0.5,
   shininess = 30,
@@ -844,6 +844,10 @@ export default function ClaudeGrassQuick2({
     terrainSize,
     grassHeight,
     grassWidth,
+    lightDirectionX,
+    lightDirectionY,
+    lightDirectionZ,
+    specularEnabled,
     enabled: true,
   });
   const groupRef = useRef();
@@ -856,14 +860,9 @@ export default function ClaudeGrassQuick2({
       const geoHigh = createGrassGeometry(GRASS_SEGMENTS_HIGH, patchSize);
       const hmap = createHeightmap();
 
-      // Calculate light direction from azimuth and elevation
-      const azimuthRad = (lightAzimuth * Math.PI) / 180;
-      const elevationRad = (lightElevation * Math.PI) / 180;
-      const lightDir = new THREE.Vector3(
-        Math.cos(elevationRad) * Math.sin(azimuthRad),
-        Math.sin(elevationRad),
-        Math.cos(elevationRad) * Math.cos(azimuthRad)
-      ).normalize();
+      // Light direction as X, Y, Z vector (will be normalized in shader)
+      // Note: This is just for initial setup, will be updated in useFrame
+      const lightDir = new THREE.Vector3(1.0, 1.0, 0.5);
 
       // Convert specular color from object to THREE.Color
       const specColor = new THREE.Color(
@@ -881,12 +880,11 @@ export default function ClaudeGrassQuick2({
         });
 
         mat.onBeforeCompile = (shader) => {
-          // Add define for specular enable/disable
-          if (specularEnabled) {
-            shader.defines.CUSTOM_SPECULAR_ENABLED = "";
-          }
+          // Specular code is always included in shader (no #ifdef guard)
+          // Control via customSpecularIntensity uniform (set to 0 to disable)
 
           // Initialize uniforms (will be updated in useFrame)
+          // IMPORTANT: Always create new uniform objects to ensure they're properly linked
           shader.uniforms.grassSize = {
             value: new THREE.Vector2(grassWidth, grassHeight),
           };
@@ -906,9 +904,15 @@ export default function ClaudeGrassQuick2({
           shader.uniforms.heightParams = {
             value: new THREE.Vector4(terrainSize, 0, 0, 0),
           };
-          shader.uniforms.playerPos = { value: playerPosition };
+          shader.uniforms.playerPos = {
+            value: playerPosition || new THREE.Vector3(0, 0, 0),
+          };
           shader.uniforms.viewMatrixInverse = { value: new THREE.Matrix4() };
-          shader.uniforms.customLightDirection = { value: lightDir.clone() };
+
+          // CRITICAL: Create specular uniforms - these MUST be created here
+          shader.uniforms.customLightDirection = {
+            value: new THREE.Vector3(1.0, 1.0, 0.5),
+          };
           shader.uniforms.customSpecularColor = { value: specColor.clone() };
           shader.uniforms.customSpecularIntensity = {
             value: specularIntensity,
@@ -918,8 +922,29 @@ export default function ClaudeGrassQuick2({
           shader.vertexShader = vertexShader;
           shader.fragmentShader = fragmentShader;
 
-          // Store reference for updates
+          // Store reference for updates - ALWAYS update this when onBeforeCompile is called
           mat.userData.shader = shader;
+
+          // Debug: log when shader is compiled
+          console.log("🌿 onBeforeCompile called - uniforms created:", {
+            hasCustomLightDirection: !!shader.uniforms.customLightDirection,
+            hasCustomSpecularColor: !!shader.uniforms.customSpecularColor,
+            hasCustomSpecularIntensity:
+              !!shader.uniforms.customSpecularIntensity,
+            lightDirValue: shader.uniforms.customLightDirection?.value,
+            specIntensityValue: shader.uniforms.customSpecularIntensity?.value,
+            material: mat,
+            willStoreInUserData: true,
+          });
+
+          // IMPORTANT: Store the shader IMMEDIATELY after setting uniforms
+          // This ensures useFrame can access the uniforms
+          mat.userData.shader = shader;
+          mat.userData.shaderReady = true;
+
+          console.log(
+            "🌿 Shader stored in userData, ready for useFrame updates"
+          );
         };
 
         mat.needsUpdate = true;
@@ -975,22 +1000,8 @@ export default function ClaudeGrassQuick2({
     }
 
     // Update shader defines if shaders are already compiled
-    if (materialLow.userData.shader && materialLow.userData.shader.defines) {
-      if (specularEnabled) {
-        materialLow.userData.shader.defines.CUSTOM_SPECULAR_ENABLED = "";
-      } else {
-        delete materialLow.userData.shader.defines.CUSTOM_SPECULAR_ENABLED;
-      }
-      materialLow.needsUpdate = true;
-    }
-    if (materialHigh.userData.shader && materialHigh.userData.shader.defines) {
-      if (specularEnabled) {
-        materialHigh.userData.shader.defines.CUSTOM_SPECULAR_ENABLED = "";
-      } else {
-        delete materialHigh.userData.shader.defines.CUSTOM_SPECULAR_ENABLED;
-      }
-      materialHigh.needsUpdate = true;
-    }
+    // No longer need to update defines - specular code is always in shader
+    // Control via customSpecularIntensity uniform (set to 0 to disable)
   }, [materialLow, materialHigh, specularEnabled, specularColor, shininess]);
 
   // Update function
@@ -999,14 +1010,27 @@ export default function ClaudeGrassQuick2({
 
     totalTime.current += delta;
 
-    // Calculate light direction from azimuth and elevation
-    const azimuthRad = (lightAzimuth * Math.PI) / 180;
-    const elevationRad = (lightElevation * Math.PI) / 180;
-    const lightDir = new THREE.Vector3(
-      Math.cos(elevationRad) * Math.sin(azimuthRad),
-      Math.sin(elevationRad),
-      Math.cos(elevationRad) * Math.cos(azimuthRad)
-    ).normalize();
+    // Light direction as X, Y, Z vector (will be normalized in shader)
+    // Use the prop values directly - they should update when controls change
+    const lightDirX = lightDirectionX ?? 1.0;
+    const lightDirY = lightDirectionY ?? 1.0;
+    const lightDirZ = lightDirectionZ ?? 0.5;
+
+    // Debug: log when props change (throttled to avoid spam)
+    if (
+      Math.abs(lightDirX - 1.0) > 0.01 ||
+      Math.abs(lightDirY - 1.0) > 0.01 ||
+      Math.abs(lightDirZ - 0.5) > 0.01
+    ) {
+      console.log(
+        "🌿 useFrame - lightDirection props changed:",
+        lightDirX,
+        lightDirY,
+        lightDirZ
+      );
+    }
+
+    const lightDir = new THREE.Vector3(lightDirX, lightDirY, lightDirZ);
 
     // Convert specular color (with safety check)
     const specColor =
@@ -1031,81 +1055,117 @@ export default function ClaudeGrassQuick2({
       materialHigh.shininess = 30;
     }
 
-    // Update shader defines for specular enable/disable
-    if (materialLow.userData.shader) {
-      const shader = materialLow.userData.shader;
-      if (shader.defines) {
-        if (specularEnabled) {
-          shader.defines.CUSTOM_SPECULAR_ENABLED = "";
-        } else {
-          delete shader.defines.CUSTOM_SPECULAR_ENABLED;
-        }
-        materialLow.needsUpdate = true;
-      }
-    }
-    if (materialHigh.userData.shader) {
-      const shader = materialHigh.userData.shader;
-      if (shader.defines) {
-        if (specularEnabled) {
-          shader.defines.CUSTOM_SPECULAR_ENABLED = "";
-        } else {
-          delete shader.defines.CUSTOM_SPECULAR_ENABLED;
-        }
-        materialHigh.needsUpdate = true;
-      }
-    }
+    // No longer need to update defines - specular code is always in shader
+    // Control via customSpecularIntensity uniform (set to 0 to disable)
 
     // Update shader uniforms dynamically
-    if (materialLow.userData.shader) {
-      const shader = materialLow.userData.shader;
-      if (!shader.uniforms) {
-        // Skip if uniforms not initialized yet
-      } else {
-        shader.uniforms.time.value = totalTime.current;
-        shader.uniforms.playerPos.value =
-          playerPosition || new THREE.Vector3(0, 0, 0);
-        shader.uniforms.viewMatrixInverse.value = camera.matrixWorld;
-        shader.uniforms.grassSize.value.set(grassWidth, grassHeight);
-        shader.uniforms.grassParams.value.set(
-          GRASS_SEGMENTS_LOW,
-          GRASS_VERTICES_LOW,
-          heightScale,
-          heightOffset
+    // Access uniforms through the material's internal shader (Three.js stores them here)
+    const updateMaterialUniforms = (material) => {
+      if (!material.userData.shader) {
+        // Debug: log when shader is missing (throttled)
+        if (Math.floor(totalTime.current * 10) % 120 === 0) {
+          console.warn("🌿 Material shader not found in userData!", material);
+        }
+        return;
+      }
+      if (!material.userData.shader.uniforms) {
+        // Debug: log when uniforms are missing (throttled)
+        if (Math.floor(totalTime.current * 10) % 120 === 0) {
+          console.warn(
+            "🌿 Shader uniforms not found!",
+            material.userData.shader
+          );
+        }
+        return;
+      }
+      const uniforms = material.userData.shader.uniforms;
+
+      uniforms.time.value = totalTime.current;
+      uniforms.playerPos.value = playerPosition || new THREE.Vector3(0, 0, 0);
+      uniforms.viewMatrixInverse.value = camera.matrixWorld;
+      uniforms.grassSize.value.set(grassWidth, grassHeight);
+      uniforms.grassParams.value.set(
+        material === materialLow ? GRASS_SEGMENTS_LOW : GRASS_SEGMENTS_HIGH,
+        material === materialLow ? GRASS_VERTICES_LOW : GRASS_VERTICES_HIGH,
+        heightScale,
+        heightOffset
+      );
+      uniforms.grassDraw.value.set(lodDistance, maxDistance, 0, 0);
+      uniforms.heightParams.value.set(terrainSize, 0, 0, 0);
+
+      // Always update light direction (not just when specular is enabled)
+      if (uniforms.customLightDirection) {
+        // Update the uniform
+        uniforms.customLightDirection.value.set(
+          lightDirX,
+          lightDirY,
+          lightDirZ
         );
-        shader.uniforms.grassDraw.value.set(lodDistance, maxDistance, 0, 0);
-        shader.uniforms.heightParams.value.set(terrainSize, 0, 0, 0);
-        if (specularEnabled) {
-          shader.uniforms.customLightDirection.value.copy(lightDir);
-          shader.uniforms.customSpecularColor.value.copy(specColor);
-          shader.uniforms.customSpecularIntensity.value = specularIntensity;
+
+        // Debug: log when updating (throttled) - ALWAYS log, not just when specular enabled
+        if (Math.floor(totalTime.current * 10) % 60 === 0) {
+          const uniformValue = uniforms.customLightDirection.value;
+          console.log(
+            "🌿 Uniform UPDATE - LightDir:",
+            "Setting:",
+            [lightDirX, lightDirY, lightDirZ],
+            "After set:",
+            [uniformValue.x, uniformValue.y, uniformValue.z],
+            "Match:",
+            uniformValue.x === lightDirX &&
+              uniformValue.y === lightDirY &&
+              uniformValue.z === lightDirZ,
+            "Specular enabled:",
+            specularEnabled
+          );
+        }
+      } else {
+        // Warn if uniform not found (throttled)
+        if (Math.floor(totalTime.current * 10) % 120 === 0) {
+          console.warn(
+            "🌿 customLightDirection uniform not found! Available custom uniforms:",
+            Object.keys(uniforms).filter((k) => k.includes("custom"))
+          );
         }
       }
-    }
-    if (materialHigh.userData.shader) {
-      const shader = materialHigh.userData.shader;
-      if (!shader.uniforms) {
-        // Skip if uniforms not initialized yet
+
+      // Always update specular uniforms (control via intensity - set to 0 to disable)
+      if (uniforms.customSpecularColor) {
+        uniforms.customSpecularColor.value.copy(specColor);
       } else {
-        shader.uniforms.time.value = totalTime.current;
-        shader.uniforms.playerPos.value =
-          playerPosition || new THREE.Vector3(0, 0, 0);
-        shader.uniforms.viewMatrixInverse.value = camera.matrixWorld;
-        shader.uniforms.grassSize.value.set(grassWidth, grassHeight);
-        shader.uniforms.grassParams.value.set(
-          GRASS_SEGMENTS_HIGH,
-          GRASS_VERTICES_HIGH,
-          heightScale,
-          heightOffset
-        );
-        shader.uniforms.grassDraw.value.set(lodDistance, maxDistance, 0, 0);
-        shader.uniforms.heightParams.value.set(terrainSize, 0, 0, 0);
-        if (specularEnabled) {
-          shader.uniforms.customLightDirection.value.copy(lightDir);
-          shader.uniforms.customSpecularColor.value.copy(specColor);
-          shader.uniforms.customSpecularIntensity.value = specularIntensity;
+        if (Math.floor(totalTime.current * 10) % 120 === 0) {
+          console.warn("🌿 customSpecularColor uniform not found!");
         }
       }
-    }
+      if (uniforms.customSpecularIntensity) {
+        // Set intensity to 0 if specular is disabled, otherwise use the provided value
+        uniforms.customSpecularIntensity.value = specularEnabled
+          ? specularIntensity
+          : 0.0;
+        // Debug: log when updating (throttled) - verify the update worked
+        if (Math.floor(totalTime.current * 10) % 60 === 0) {
+          console.log(
+            "🌿 Uniform UPDATE - SpecularIntensity:",
+            "Setting:",
+            specularEnabled ? specularIntensity : 0.0,
+            "After set:",
+            uniforms.customSpecularIntensity.value,
+            "Match:",
+            uniforms.customSpecularIntensity.value ===
+              (specularEnabled ? specularIntensity : 0.0),
+            "Specular enabled:",
+            specularEnabled
+          );
+        }
+      } else {
+        if (Math.floor(totalTime.current * 10) % 120 === 0) {
+          console.warn("🌿 customSpecularIntensity uniform not found!");
+        }
+      }
+    };
+
+    updateMaterialUniforms(materialLow);
+    updateMaterialUniforms(materialHigh);
 
     // Frustum culling setup
     const frustum = new THREE.Frustum();
