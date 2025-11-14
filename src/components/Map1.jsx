@@ -1756,6 +1756,21 @@ export const Map1 = ({
           playerInteractionStrength={
             claudeGrassQuick3Controls.playerInteractionStrength
           }
+          playerInteractionHeightThreshold={
+            claudeGrassQuick3Controls.playerInteractionHeightThreshold
+          }
+          baseColor1={claudeGrassQuick3Controls.baseColor1}
+          baseColor2={claudeGrassQuick3Controls.baseColor2}
+          tipColor1={claudeGrassQuick3Controls.tipColor1}
+          tipColor2={claudeGrassQuick3Controls.tipColor2}
+          gradientCurve={claudeGrassQuick3Controls.gradientCurve}
+          aoEnabled={claudeGrassQuick3Controls.aoEnabled}
+          aoIntensity={claudeGrassQuick3Controls.aoIntensity}
+          fogEnabled={claudeGrassQuick3Controls.fogEnabled}
+          fogNear={claudeGrassQuick3Controls.fogNear}
+          fogFar={claudeGrassQuick3Controls.fogFar}
+          fogIntensity={claudeGrassQuick3Controls.fogIntensity}
+          fogColor={claudeGrassQuick3Controls.fogColor}
         />
       )}
 

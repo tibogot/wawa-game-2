@@ -88,6 +88,36 @@ export default function useClaudeGrassQuick3Controls() {
           label: "↕️ Height Offset",
         },
 
+        // Grass Colors
+        colors: folder(
+          {
+            baseColor1: {
+              value: "#051303",
+              label: "Base Color 1 (Dark)",
+            },
+            baseColor2: {
+              value: "#061a03",
+              label: "Base Color 2 (Light)",
+            },
+            tipColor1: {
+              value: "#a6cc40",
+              label: "Tip Color 1 (Dark)",
+            },
+            tipColor2: {
+              value: "#cce666",
+              label: "Tip Color 2 (Light)",
+            },
+            gradientCurve: {
+              value: 4.0,
+              min: 0.5,
+              max: 10.0,
+              step: 0.1,
+              label: "📈 Gradient Curve (Steepness)",
+            },
+          },
+          { collapsed: true }
+        ),
+
         // Wind Controls
         wind: folder(
           {
@@ -134,6 +164,60 @@ export default function useClaudeGrassQuick3Controls() {
           { collapsed: true }
         ),
 
+        // Advanced Parameters
+        advanced: folder(
+          {
+            aoEnabled: {
+              value: true,
+              label: "Enable AO",
+            },
+            aoIntensity: {
+              value: 1.0,
+              min: 0,
+              max: 2,
+              step: 0.1,
+              label: "AO Intensity",
+            },
+          },
+          { collapsed: true }
+        ),
+
+        // Fog Controls
+        fog: folder(
+          {
+            fogEnabled: {
+              value: false,
+              label: "Enable Fog",
+            },
+            fogNear: {
+              value: 5.0,
+              min: 0,
+              max: 100,
+              step: 0.5,
+              label: "Fog Start",
+            },
+            fogFar: {
+              value: 50.0,
+              min: 0,
+              max: 200,
+              step: 1,
+              label: "Fog End",
+            },
+            fogIntensity: {
+              value: 1.0,
+              min: 0,
+              max: 2,
+              step: 0.1,
+              label: "Fog Intensity",
+            },
+            fogColor: {
+              value: "#4f74af",
+              label: "Fog Color",
+            },
+          },
+          { collapsed: true }
+        ),
+
         // Player Interaction Controls
         playerInteraction: folder(
           {
@@ -158,6 +242,13 @@ export default function useClaudeGrassQuick3Controls() {
               max: 1.0,
               step: 0.05,
               label: "Interaction Strength",
+            },
+            playerInteractionHeightThreshold: {
+              value: 3.0,
+              min: 1.0,
+              max: 10.0,
+              step: 0.1,
+              label: "Height Threshold",
             },
           },
           { collapsed: true }

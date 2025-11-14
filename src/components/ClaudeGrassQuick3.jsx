@@ -178,20 +178,6 @@ vec3 CalculateSkyLighting(vec3 viewDir, vec3 normalDir) {
 vec3 CalculateSkyFog(vec3 normalDir) {
   return CalculateSkyLighting(normalDir, normalDir);
 }
-
-vec3 CalculateFog(vec3 baseColour, vec3 viewDir, float sceneDepth) {
-  float SKY_fogScatterDensity = 0.0005;
-  float SKY_fogExtinctionDensity = 0.003;
-
-  vec3 fogSkyColour = CalculateSkyFog(-viewDir);
-  float fogDepth = sceneDepth * sceneDepth;
-
-  float fogScatterFactor = exp(-SKY_fogScatterDensity * SKY_fogScatterDensity * fogDepth);
-  float fogExtinctionFactor = exp(-SKY_fogExtinctionDensity * SKY_fogExtinctionDensity * fogDepth);
-
-  vec3 finalColour = baseColour * fogExtinctionFactor + fogSkyColour * (1.0 - fogScatterFactor);
-  return finalColour;
-}
 `;
 
 // Vertex Shader
@@ -232,6 +218,14 @@ uniform vec4 windParams; // x: dirScale, y: dirSpeed, z: strengthScale, w: stren
 uniform float windStrength;
 uniform vec2 playerInteractionParams; // x: range, y: strength
 uniform float playerInteractionRepel; // 1.0 for repel, -1.0 for attract
+uniform float playerInteractionHeightThreshold;
+uniform vec3 uBaseColor1;
+uniform vec3 uBaseColor2;
+uniform vec3 uTipColor1;
+uniform vec3 uTipColor2;
+uniform float uGradientCurve;
+uniform bool uAoEnabled;
+uniform float uAoIntensity;
 
 attribute float vertIndex;
 
@@ -384,8 +378,8 @@ void main() {
   // Player interaction - using uniforms
   distToPlayer = distance(grassBladeWorldPos.xz, playerPos.xz);
   heightDiff = abs(grassBladeWorldPos.y - playerPos.y);
-  // Only affect grass if player is within reasonable height range (3 units = player height + jump)
-  heightFalloff = smoothstep(3.0, 0.0, heightDiff);
+  // Only affect grass if player is within reasonable height range
+  heightFalloff = smoothstep(playerInteractionHeightThreshold, 0.0, heightDiff);
   // Distance falloff (horizontal only)
   distanceFalloff = smoothstep(playerInteractionParams.x, 1.0, distToPlayer);
   // Combine both falloffs - player must be both close horizontally AND at ground level
@@ -433,15 +427,15 @@ void main() {
   grassVertexPosition = grassMat * grassVertexPosition;
   grassVertexPosition += grassOffset;
 
-  // Color gradient
-  b1 = vec3(0.02, 0.075, 0.01);
-  b2 = vec3(0.025, 0.1, 0.01);
-  t1 = vec3(0.65, 0.8, 0.25);
-  t2 = vec3(0.8, 0.9, 0.4);
+  // Color gradient - using uniforms
+  b1 = uBaseColor1;
+  b2 = uBaseColor2;
+  t1 = uTipColor1;
+  t2 = uTipColor2;
 
   baseColour = mix(b1, b2, hashGrassColour.x);
   tipColour = mix(t1, t2, hashGrassColour.y);
-  highLODColour = mix(baseColour, tipColour, easeIn(heightPercent, 4.0)) * randomShade;
+  highLODColour = mix(baseColour, tipColour, easeIn(heightPercent, uGradientCurve)) * randomShade;
   lowLODColour = mix(b1, t1, heightPercent);
   vGrassColour = mix(highLODColour, lowLODColour, highLODOut);
   vGrassParams = vec4(heightPercent, grassBladeWorldPos.y, highLODOut, xSide);
@@ -548,6 +542,13 @@ uniform sampler2D grassTexture;
 uniform vec3 grassLODColour;
 uniform float time;
 uniform mat3 normalMatrix;
+uniform bool uAoEnabled;
+uniform float uAoIntensity;
+uniform bool uFogEnabled;
+uniform float uFogNear;
+uniform float uFogFar;
+uniform float uFogIntensity;
+uniform vec3 uFogColor;
 
 // Utility functions
 // Note: saturate might be defined by Three.js, so we check and undefine if needed
@@ -623,17 +624,25 @@ vec3 CalculateSkyFog(vec3 normalDir) {
   return CalculateSkyLighting(normalDir, normalDir);
 }
 
+// CalculateFog is only used in fragment shader, so it's defined here
+// (not in SHADER_COMMON) to avoid needing fog uniforms in vertex shader
 vec3 CalculateFog(vec3 baseColour, vec3 viewDir, float sceneDepth) {
-  float SKY_fogScatterDensity = 0.0005;
-  float SKY_fogExtinctionDensity = 0.003;
+  if (!uFogEnabled) {
+    return baseColour;
+  }
+  
+  // Use linear depth for more visible and controllable fog
+  float fogDepth = sceneDepth;
+  
+  // Calculate fog factor (0 = no fog, 1 = full fog)
+  float fogFactor = clamp((fogDepth - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
+  
+  // Apply fog intensity
+  fogFactor *= uFogIntensity;
+  fogFactor = clamp(fogFactor, 0.0, 1.0);
 
-  vec3 fogSkyColour = CalculateSkyFog(-viewDir);
-  float fogDepth = sceneDepth * sceneDepth;
-
-  float fogScatterFactor = exp(-SKY_fogScatterDensity * SKY_fogScatterDensity * fogDepth);
-  float fogExtinctionFactor = exp(-SKY_fogExtinctionDensity * SKY_fogExtinctionDensity * fogDepth);
-
-  vec3 finalColour = baseColour * fogExtinctionFactor + fogSkyColour * (1.0 - fogScatterFactor);
+  // Mix base color with fog color
+  vec3 finalColour = mix(baseColour, uFogColor, fogFactor);
   return finalColour;
 }
 
@@ -676,12 +685,15 @@ void main() {
 
   density = 1.0 - isSandy;
 
-  aoForDensity = mix(1.0, 0.25, density);
-  ao = mix(aoForDensity, 1.0, easeIn(heightPercent, 2.0));
+  // Ambient Occlusion - darker at base, brighter at tip
+  if (uAoEnabled) {
+    aoForDensity = mix(1.0, 0.25, density);
+    ao = mix(aoForDensity, 1.0, easeIn(heightPercent, 2.0));
+    diffuseColor.rgb *= ao * uAoIntensity;
+  }
 
   diffuseColor.rgb *= vGrassColour;
   diffuseColor.rgb *= mix(0.85, 1.0, grassMiddle);
-  diffuseColor.rgb *= ao;
 
   reflectedLight = ReflectedLight(vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
   totalEmissiveRadiance = emissive;
@@ -845,9 +857,53 @@ export default function ClaudeGrassQuick3({
   playerInteractionRepel = true,
   playerInteractionRange = 2.5,
   playerInteractionStrength = 0.2,
+  playerInteractionHeightThreshold = 3.0,
+  baseColor1 = "#051303",
+  baseColor2 = "#061a03",
+  tipColor1 = "#a6cc40",
+  tipColor2 = "#cce666",
+  gradientCurve = 4.0,
+  aoEnabled = true,
+  aoIntensity = 1.0,
+  fogEnabled = false,
+  fogNear = 5.0,
+  fogFar = 50.0,
+  fogIntensity = 1.0,
+  fogColor = "#4f74af",
 }) {
   const groupRef = useRef();
   const { camera } = useThree();
+
+  // Helper function to convert sRGB to linear
+  const convertSRGBToLinear = (color) => {
+    const c = new THREE.Color(color);
+    // Convert each channel from sRGB to linear
+    c.r = c.r <= 0.04045 ? c.r / 12.92 : Math.pow((c.r + 0.055) / 1.055, 2.4);
+    c.g = c.g <= 0.04045 ? c.g / 12.92 : Math.pow((c.g + 0.055) / 1.055, 2.4);
+    c.b = c.b <= 0.04045 ? c.b / 12.92 : Math.pow((c.b + 0.055) / 1.055, 2.4);
+    return c;
+  };
+
+  // Color refs for uniform updates - convert sRGB to linear
+  const baseColor1Ref = useRef(convertSRGBToLinear(baseColor1));
+  const baseColor2Ref = useRef(convertSRGBToLinear(baseColor2));
+  const tipColor1Ref = useRef(convertSRGBToLinear(tipColor1));
+  const tipColor2Ref = useRef(convertSRGBToLinear(tipColor2));
+  const fogColorRef = useRef(convertSRGBToLinear(fogColor));
+
+  // Update color refs when props change - convert to linear space
+  useEffect(() => {
+    const c1 = convertSRGBToLinear(baseColor1);
+    const c2 = convertSRGBToLinear(baseColor2);
+    const c3 = convertSRGBToLinear(tipColor1);
+    const c4 = convertSRGBToLinear(tipColor2);
+    const fog = convertSRGBToLinear(fogColor);
+    baseColor1Ref.current.copy(c1);
+    baseColor2Ref.current.copy(c2);
+    tipColor1Ref.current.copy(c3);
+    tipColor2Ref.current.copy(c4);
+    fogColorRef.current.copy(fog);
+  }, [baseColor1, baseColor2, tipColor1, tipColor2, fogColor]);
 
   // Create geometries and materials ONCE - never recreate them
   const { geometryLow, geometryHigh, materialLow, materialHigh, heightmap } =
@@ -858,7 +914,7 @@ export default function ClaudeGrassQuick3({
 
       const createMaterial = (segments, vertices) => {
         const mat = new THREE.MeshPhongMaterial({
-          color: 0x00ff00,
+          color: 0xffffff, // White - grass colors come from uniforms, not material color
           side: THREE.FrontSide,
         });
 
@@ -908,6 +964,27 @@ export default function ClaudeGrassQuick3({
           shader.uniforms.playerInteractionRepel = {
             value: playerInteractionRepel ? 1.0 : -1.0,
           };
+          shader.uniforms.playerInteractionHeightThreshold = {
+            value: playerInteractionHeightThreshold,
+          };
+
+          // Grass color uniforms
+          shader.uniforms.uBaseColor1 = {
+            value: baseColor1Ref.current.clone(),
+          };
+          shader.uniforms.uBaseColor2 = {
+            value: baseColor2Ref.current.clone(),
+          };
+          shader.uniforms.uTipColor1 = { value: tipColor1Ref.current.clone() };
+          shader.uniforms.uTipColor2 = { value: tipColor2Ref.current.clone() };
+          shader.uniforms.uGradientCurve = { value: gradientCurve };
+          shader.uniforms.uAoEnabled = { value: aoEnabled };
+          shader.uniforms.uAoIntensity = { value: aoIntensity };
+          shader.uniforms.uFogEnabled = { value: fogEnabled };
+          shader.uniforms.uFogNear = { value: fogNear };
+          shader.uniforms.uFogFar = { value: fogFar };
+          shader.uniforms.uFogIntensity = { value: fogIntensity };
+          shader.uniforms.uFogColor = { value: fogColorRef.current.clone() };
 
           // Replace shaders with complete versions
           shader.vertexShader = vertexShader;
@@ -1034,6 +1111,32 @@ export default function ClaudeGrassQuick3({
       );
       materialLow.userData.shader.uniforms.playerInteractionRepel.value =
         playerInteractionRepel ? 1.0 : -1.0;
+      materialLow.userData.shader.uniforms.playerInteractionHeightThreshold.value =
+        playerInteractionHeightThreshold;
+
+      // Update grass color uniforms
+      materialLow.userData.shader.uniforms.uBaseColor1.value.copy(
+        baseColor1Ref.current
+      );
+      materialLow.userData.shader.uniforms.uBaseColor2.value.copy(
+        baseColor2Ref.current
+      );
+      materialLow.userData.shader.uniforms.uTipColor1.value.copy(
+        tipColor1Ref.current
+      );
+      materialLow.userData.shader.uniforms.uTipColor2.value.copy(
+        tipColor2Ref.current
+      );
+      materialLow.userData.shader.uniforms.uGradientCurve.value = gradientCurve;
+      materialLow.userData.shader.uniforms.uAoEnabled.value = aoEnabled;
+      materialLow.userData.shader.uniforms.uAoIntensity.value = aoIntensity;
+      materialLow.userData.shader.uniforms.uFogEnabled.value = fogEnabled;
+      materialLow.userData.shader.uniforms.uFogNear.value = fogNear;
+      materialLow.userData.shader.uniforms.uFogFar.value = fogFar;
+      materialLow.userData.shader.uniforms.uFogIntensity.value = fogIntensity;
+      materialLow.userData.shader.uniforms.uFogColor.value.copy(
+        fogColorRef.current
+      );
 
       // Debug log uniforms every 60 frames
       if (Math.floor(totalTime.current * 60) % 60 === 0) {
@@ -1085,6 +1188,33 @@ export default function ClaudeGrassQuick3({
       );
       materialHigh.userData.shader.uniforms.playerInteractionRepel.value =
         playerInteractionRepel ? 1.0 : -1.0;
+      materialHigh.userData.shader.uniforms.playerInteractionHeightThreshold.value =
+        playerInteractionHeightThreshold;
+
+      // Update grass color uniforms
+      materialHigh.userData.shader.uniforms.uBaseColor1.value.copy(
+        baseColor1Ref.current
+      );
+      materialHigh.userData.shader.uniforms.uBaseColor2.value.copy(
+        baseColor2Ref.current
+      );
+      materialHigh.userData.shader.uniforms.uTipColor1.value.copy(
+        tipColor1Ref.current
+      );
+      materialHigh.userData.shader.uniforms.uTipColor2.value.copy(
+        tipColor2Ref.current
+      );
+      materialHigh.userData.shader.uniforms.uGradientCurve.value =
+        gradientCurve;
+      materialHigh.userData.shader.uniforms.uAoEnabled.value = aoEnabled;
+      materialHigh.userData.shader.uniforms.uAoIntensity.value = aoIntensity;
+      materialHigh.userData.shader.uniforms.uFogEnabled.value = fogEnabled;
+      materialHigh.userData.shader.uniforms.uFogNear.value = fogNear;
+      materialHigh.userData.shader.uniforms.uFogFar.value = fogFar;
+      materialHigh.userData.shader.uniforms.uFogIntensity.value = fogIntensity;
+      materialHigh.userData.shader.uniforms.uFogColor.value.copy(
+        fogColorRef.current
+      );
     }
 
     // Frustum culling setup
