@@ -40,6 +40,7 @@ import { FlowingLinesSimple } from "./FlowingLinesSimple";
 import { WindFlag } from "./WindFlag";
 import { useWindFlagControls } from "./useWindFlagControls";
 import { AdBillboard } from "./AdBillboard";
+import Flag from "./FlagClaude";
 import { useAdBillboardControls } from "./useAdBillboardControls";
 import { RipplePlane } from "./RipplePlane";
 import { DeerController } from "./DeerController";
@@ -1556,6 +1557,14 @@ export const Map1 = ({
           textureQuality={adBillboardTextureQuality}
         />
       )}
+
+      {/* FlagClaude - Realistic waving flag with self-shadowing */}
+      <Flag
+        textureUrl="https://assets.codepen.io/6958575/internal/avatars/users/default.png"
+        enableWind={true}
+        position={[0, 2, 0]}
+        scale={2}
+      />
       {/* Dynamic Leaves v3 */}
       {dynamicLeaves3Enabled && (
         <DynamicLeaves3
