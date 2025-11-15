@@ -157,6 +157,12 @@ const Flag = forwardRef(
     {
       textureUrl = "https://assets.codepen.io/6958575/internal/avatars/users/default.png",
       enableWind = true,
+      windIntensity = 300,
+      windDirectionX = 100,
+      windDirectionY = 0,
+      windDirectionZ = 1,
+      windSpeed = 1000,
+      windOscillation = 1,
       pins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
       position = [0, 0, 0],
       scale = 1,
@@ -172,6 +178,12 @@ const Flag = forwardRef(
     const clothRef = useRef();
     const pinsRef = useRef(pins);
     const enableWindRef = useRef(enableWind);
+    const windIntensityRef = useRef(windIntensity);
+    const windDirectionXRef = useRef(windDirectionX);
+    const windDirectionYRef = useRef(windDirectionY);
+    const windDirectionZRef = useRef(windDirectionZ);
+    const windSpeedRef = useRef(windSpeed);
+    const windOscillationRef = useRef(windOscillation);
 
     // Load texture
     const texture = useLoader(TextureLoader, textureUrl);
@@ -211,6 +223,30 @@ const Flag = forwardRef(
       pinsRef.current = pins;
     }, [pins]);
 
+    useEffect(() => {
+      windIntensityRef.current = windIntensity;
+    }, [windIntensity]);
+
+    useEffect(() => {
+      windDirectionXRef.current = windDirectionX;
+    }, [windDirectionX]);
+
+    useEffect(() => {
+      windDirectionYRef.current = windDirectionY;
+    }, [windDirectionY]);
+
+    useEffect(() => {
+      windDirectionZRef.current = windDirectionZ;
+    }, [windDirectionZ]);
+
+    useEffect(() => {
+      windSpeedRef.current = windSpeed;
+    }, [windSpeed]);
+
+    useEffect(() => {
+      windOscillationRef.current = windOscillation;
+    }, [windOscillation]);
+
     // Physics simulation in useFrame - EXACT same as original
     useFrame((state) => {
       const time = state.clock.elapsedTime * 1000;
@@ -218,10 +254,16 @@ const Flag = forwardRef(
 
       if (!cloth) return;
 
-      // Update wind force
-      windForce.set(100, 0, Math.sin(time / 1000));
+      // Update wind force with controllable parameters
+      const oscillation =
+        Math.sin(time / windSpeedRef.current) * windOscillationRef.current;
+      windForce.set(
+        windDirectionXRef.current,
+        windDirectionYRef.current,
+        windDirectionZRef.current + oscillation
+      );
       windForce.normalize();
-      windForce.multiplyScalar(300);
+      windForce.multiplyScalar(windIntensityRef.current);
 
       const particles = cloth.particles;
 

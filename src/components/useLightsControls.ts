@@ -84,7 +84,7 @@ export const useLightsControls = () => {
           label: "Color",
         },
         directionalPosition: {
-          value: [-15, 20, 15],
+          value: [15, 20, -15],
           label: "Position [X, Y, Z]",
         },
         shadowMapSize: {

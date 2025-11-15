@@ -1471,10 +1471,24 @@ export const Map1 = ({
     flagClaudeYOffset,
     flagClaudeScale,
     flagClaudeTextureUrl,
+    flagClaudeAlleyEnabled,
+    flagClaudeAlleyStartZ,
+    flagClaudeAlleySpacing,
+    flagClaudeAlleyLeftOffset,
+    flagClaudeAlleyRightOffset,
+    flagClaudeAlleyCount,
+    flagClaudeWindEnabled,
+    flagClaudeWindIntensity,
+    flagClaudeWindDirectionX,
+    flagClaudeWindDirectionY,
+    flagClaudeWindDirectionZ,
+    flagClaudeWindSpeed,
+    flagClaudeWindOscillation,
   } = useFlagClaudeControls();
 
-  // Ref for FlagClaude to adjust position dynamically
+  // Refs for FlagClaude flags (single flag + alley flags)
   const flagClaudeRef = useRef();
+  const flagAlleyRefs = useRef([]);
 
   // Calculate FlagClaude position with terrain height adjustment using bounding box
   const flagClaudeInitialPosition = useMemo(() => {
@@ -1482,9 +1496,49 @@ export const Map1 = ({
     return [flagClaudePosition[0], 0, flagClaudePosition[1]]; // Temporary Y, will be adjusted
   }, [flagClaudeEnabled, flagClaudePosition]);
 
-  // Adjust FlagClaude position to sit on ground using bounding box (like Rock1)
+  // Calculate alley flag positions
+  const flagAlleyPositions = useMemo(() => {
+    if (!flagClaudeAlleyEnabled) return [];
+
+    const positions = [];
+    const count = flagClaudeAlleyCount;
+
+    // Left side flags
+    for (let i = 0; i < count; i++) {
+      const z = flagClaudeAlleyStartZ + i * flagClaudeAlleySpacing;
+      positions.push({
+        x: flagClaudeAlleyLeftOffset,
+        z: z,
+        side: "left",
+        index: i,
+      });
+    }
+
+    // Right side flags
+    for (let i = 0; i < count; i++) {
+      const z = flagClaudeAlleyStartZ + i * flagClaudeAlleySpacing;
+      positions.push({
+        x: flagClaudeAlleyRightOffset,
+        z: z,
+        side: "right",
+        index: i,
+      });
+    }
+
+    return positions;
+  }, [
+    flagClaudeAlleyEnabled,
+    flagClaudeAlleyStartZ,
+    flagClaudeAlleySpacing,
+    flagClaudeAlleyLeftOffset,
+    flagClaudeAlleyRightOffset,
+    flagClaudeAlleyCount,
+  ]);
+
+  // Adjust single FlagClaude position to sit on ground using bounding box (like Rock1)
   useEffect(() => {
-    if (!flagClaudeEnabled || !flagClaudeRef.current) return;
+    if (!flagClaudeEnabled || flagClaudeAlleyEnabled || !flagClaudeRef.current)
+      return;
 
     // Wait a frame for the component to render
     const timeoutId = setTimeout(() => {
@@ -1521,7 +1575,42 @@ export const Map1 = ({
     return () => clearTimeout(timeoutId);
   }, [
     flagClaudeEnabled,
+    flagClaudeAlleyEnabled,
     flagClaudePosition,
+    flagClaudeYOffset,
+    flagClaudeScale,
+    getGroundHeight,
+  ]);
+
+  // Adjust alley flag positions to sit on ground
+  useEffect(() => {
+    if (!flagClaudeAlleyEnabled || !flagAlleyPositions.length) return;
+
+    const timeoutId = setTimeout(() => {
+      flagAlleyPositions.forEach((pos, index) => {
+        const flagRef = flagAlleyRefs.current[index];
+        if (!flagRef) return;
+
+        // Calculate bounding box
+        const bbox = new THREE.Box3();
+        bbox.setFromObject(flagRef);
+
+        // Get terrain height at flag position
+        const terrainHeight = getGroundHeight(pos.x, pos.z);
+
+        // Get bottom Y
+        const bottomY = bbox.min.y;
+
+        // Adjust position
+        const adjustedY = terrainHeight - bottomY + flagClaudeYOffset;
+        flagRef.position.y = adjustedY;
+      });
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    flagClaudeAlleyEnabled,
+    flagAlleyPositions,
     flagClaudeYOffset,
     flagClaudeScale,
     getGroundHeight,
@@ -1622,15 +1711,45 @@ export const Map1 = ({
         />
       )}
 
-      {/* FlagClaude - Realistic waving flag with self-shadowing */}
-      {flagClaudeEnabled && (
+      {/* FlagClaude - Single flag or alley of flags */}
+      {flagClaudeEnabled && !flagClaudeAlleyEnabled && (
         <Flag
           ref={flagClaudeRef}
           textureUrl={flagClaudeTextureUrl}
-          enableWind={true}
+          enableWind={flagClaudeWindEnabled}
+          windIntensity={flagClaudeWindIntensity}
+          windDirectionX={flagClaudeWindDirectionX}
+          windDirectionY={flagClaudeWindDirectionY}
+          windDirectionZ={flagClaudeWindDirectionZ}
+          windSpeed={flagClaudeWindSpeed}
+          windOscillation={flagClaudeWindOscillation}
           position={flagClaudeInitialPosition}
           scale={flagClaudeScale}
         />
+      )}
+
+      {/* FlagClaude Alley - 5 flags on left, 5 on right */}
+      {flagClaudeEnabled && flagClaudeAlleyEnabled && (
+        <>
+          {flagAlleyPositions.map((pos, index) => (
+            <Flag
+              key={`flag-alley-${pos.side}-${pos.index}`}
+              ref={(ref) => {
+                flagAlleyRefs.current[index] = ref;
+              }}
+              textureUrl={flagClaudeTextureUrl}
+              enableWind={flagClaudeWindEnabled}
+              windIntensity={flagClaudeWindIntensity}
+              windDirectionX={flagClaudeWindDirectionX}
+              windDirectionY={flagClaudeWindDirectionY}
+              windDirectionZ={flagClaudeWindDirectionZ}
+              windSpeed={flagClaudeWindSpeed}
+              windOscillation={flagClaudeWindOscillation}
+              position={[pos.x, 0, pos.z]}
+              scale={flagClaudeScale}
+            />
+          ))}
+        </>
       )}
       {/* Dynamic Leaves v3 */}
       {dynamicLeaves3Enabled && (
