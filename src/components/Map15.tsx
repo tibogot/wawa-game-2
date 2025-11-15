@@ -219,6 +219,7 @@ export const Map15 = forwardRef<THREE.Mesh | null, Map15Props>(
         <PhysicsDebugCubes enabled={physicsReady} spawnHeight={5} />
         <CylinderTile position={[-10, 0, 10]} />
         <ParkourTile position={[10, 0, -10]} />
+        <HoleWallTile position={[-20, 0, -20]} />
         <ElevatorPlatform position={[0, 0, 15]} />
         <StaticPlatform position={[0, 12, 24]} size={[12, 1, 10]} />
         <StaticPlatform position={[8, 13, 24]} size={[6, 1, 6]} />
@@ -307,8 +308,10 @@ type ExtractedMesh = {
 
 const CYLINDER_PATH = "/models/parkour/cylinder.glb";
 const PARKOUR_PATH = "/models/parkour/parkour1.glb";
+const HOLEWALL_PATH = "/models/parkour/holewall.glb";
 useGLTF.preload(CYLINDER_PATH);
 useGLTF.preload(PARKOUR_PATH);
+useGLTF.preload(HOLEWALL_PATH);
 
 type SharedTileProps = {
   position?: [number, number, number];
@@ -424,6 +427,40 @@ const ParkourTile = ({ position = [0, 0, 0] }: SharedTileProps) => {
       }),
     [scene]
   );
+
+  return (
+    <RigidBody
+      type="fixed"
+      colliders="trimesh"
+      position={position}
+      friction={1}
+      restitution={0}
+    >
+      {meshes.map((mesh, index) => (
+        <mesh
+          key={index}
+          geometry={mesh.geometry}
+          position={mesh.position}
+          rotation={mesh.rotation}
+          scale={mesh.scale}
+          castShadow
+          receiveShadow
+        >
+          <TileMaterial
+            textureScale={mesh.textureScale}
+            gradientBias={-0.5}
+            gradientIntensity={2}
+          />
+        </mesh>
+      ))}
+    </RigidBody>
+  );
+};
+
+const HoleWallTile = ({ position = [0, 0, 0] }: SharedTileProps) => {
+  const { scene } = useGLTF(HOLEWALL_PATH);
+
+  const meshes = useMemo(() => createMeshEntries(scene), [scene]);
 
   return (
     <RigidBody

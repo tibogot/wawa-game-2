@@ -46,6 +46,7 @@ import { useAdBillboardControls } from "./useAdBillboardControls";
 import { RipplePlane } from "./RipplePlane";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
+import { Model as WomanAndSwan } from "./The_woman_and_the_swan";
 import { TornadoLeaves } from "./TornadoLeaves";
 import { FloatingLeaves } from "./FloatingLeaves";
 import FallingLeaves from "./FallingLeaves";
@@ -1633,6 +1634,19 @@ export const Map1 = ({
     adBillboardTextureQuality,
   } = useAdBillboardControls();
 
+  // Woman and Swan statue controls
+  const { womanAndSwanEnabled } = useControls("🏛️ OBJECTS", {
+    womanAndSwan: folder(
+      {
+        womanAndSwanEnabled: {
+          value: false,
+          label: "🗿 Enable Woman and Swan Statue",
+        },
+      },
+      { collapsed: true }
+    ),
+  });
+
   return (
     <group ref={group} {...props}>
       {skyboxEnabled && <Skybox />}
@@ -2590,6 +2604,16 @@ export const Map1 = ({
       {/* Wildlife */}
       <DeerController position={[5, 1, 5]} />
       <DeerHerd spawnHeight={1} />
+
+      {/* The Woman and the Swan sculpture */}
+      {womanAndSwanEnabled && (
+        <WomanAndSwan
+          position={[0, 0, 15]}
+          scale={0.1}
+          castShadow
+          receiveShadow
+        />
+      )}
     </group>
   );
 };

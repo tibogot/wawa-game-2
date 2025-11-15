@@ -18,7 +18,7 @@ export const useFlagClaudeControls = () => {
           label: "⬆️ Y Height Offset",
         },
         flagClaudeScale: {
-          value: 8.0,
+          value: 10.0,
           min: 0.1,
           max: 10.0,
           step: 0.1,
