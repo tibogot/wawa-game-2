@@ -73,7 +73,7 @@ export const useLightsControls = () => {
     sun: folder(
       {
         directionalIntensity: {
-          value: 1.0,
+          value: 1.5,
           min: 0,
           max: 5,
           step: 0.05,

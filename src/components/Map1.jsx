@@ -41,6 +41,7 @@ import { WindFlag } from "./WindFlag";
 import { useWindFlagControls } from "./useWindFlagControls";
 import { AdBillboard } from "./AdBillboard";
 import Flag from "./FlagClaude";
+import { useFlagClaudeControls } from "./useFlagClaudeControls";
 import { useAdBillboardControls } from "./useAdBillboardControls";
 import { RipplePlane } from "./RipplePlane";
 import { DeerController } from "./DeerController";
@@ -1463,6 +1464,69 @@ export const Map1 = ({
     windFlagWaveIntensity,
   } = useWindFlagControls();
 
+  // FlagClaude controls
+  const {
+    flagClaudeEnabled,
+    flagClaudePosition,
+    flagClaudeYOffset,
+    flagClaudeScale,
+    flagClaudeTextureUrl,
+  } = useFlagClaudeControls();
+
+  // Ref for FlagClaude to adjust position dynamically
+  const flagClaudeRef = useRef();
+
+  // Calculate FlagClaude position with terrain height adjustment using bounding box
+  const flagClaudeInitialPosition = useMemo(() => {
+    if (!flagClaudeEnabled) return [0, 0, 0];
+    return [flagClaudePosition[0], 0, flagClaudePosition[1]]; // Temporary Y, will be adjusted
+  }, [flagClaudeEnabled, flagClaudePosition]);
+
+  // Adjust FlagClaude position to sit on ground using bounding box (like Rock1)
+  useEffect(() => {
+    if (!flagClaudeEnabled || !flagClaudeRef.current) return;
+
+    // Wait a frame for the component to render
+    const timeoutId = setTimeout(() => {
+      if (!flagClaudeRef.current) return;
+
+      // Calculate bounding box of the flag group to find the bottom
+      const bbox = new THREE.Box3();
+      bbox.setFromObject(flagClaudeRef.current);
+
+      // Get the terrain height at flag position
+      const terrainHeight = getGroundHeight(
+        flagClaudePosition[0],
+        flagClaudePosition[1]
+      );
+
+      // Get the bottom Y of the bounding box
+      const bottomY = bbox.min.y;
+
+      // Adjust position so bottom touches terrain
+      const adjustedY = terrainHeight - bottomY + flagClaudeYOffset;
+
+      // Update the position
+      flagClaudeRef.current.position.y = adjustedY;
+
+      console.log(
+        `FlagClaude at [${flagClaudePosition[0]}, ${
+          flagClaudePosition[1]
+        }] -> terrain height: ${terrainHeight.toFixed(
+          2
+        )}, bottom: ${bottomY.toFixed(2)}, adjusted Y: ${adjustedY.toFixed(2)}`
+      );
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    flagClaudeEnabled,
+    flagClaudePosition,
+    flagClaudeYOffset,
+    flagClaudeScale,
+    getGroundHeight,
+  ]);
+
   // AdBillboard controls
   const {
     adBillboardEnabled,
@@ -1559,12 +1623,15 @@ export const Map1 = ({
       )}
 
       {/* FlagClaude - Realistic waving flag with self-shadowing */}
-      <Flag
-        textureUrl="https://assets.codepen.io/6958575/internal/avatars/users/default.png"
-        enableWind={true}
-        position={[0, 2, 0]}
-        scale={2}
-      />
+      {flagClaudeEnabled && (
+        <Flag
+          ref={flagClaudeRef}
+          textureUrl={flagClaudeTextureUrl}
+          enableWind={true}
+          position={flagClaudeInitialPosition}
+          scale={flagClaudeScale}
+        />
+      )}
       {/* Dynamic Leaves v3 */}
       {dynamicLeaves3Enabled && (
         <DynamicLeaves3
