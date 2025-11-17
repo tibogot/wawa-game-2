@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { acceleratedRaycast } from "three-mesh-bvh";
 
-const GRASS_BLADES = 1024; // Matches tutorial exactly (32x32 = 1024)
+const GRASS_BLADES = 4096; // Increased density (64x64 = 4096)
 const GRASS_BLADE_VERTICES = 15; // Matches tutorial exactly
 const GRASS_PATCH_SIZE = 10; // Patch size to match tutorial field size
 
@@ -153,25 +153,52 @@ void main() {
   float GRASS_BLADE_VERTICES_F = ${GRASS_BLADE_VERTICES}.0;
   
   // Figure out which vertex this is (matches tutorial)
-  // Assuming 7 segments with 2 vertices each = 14 vertices, structure may vary
-  // TODO: Need to see tutorial's vertex structure to match exactly
+  // Structure: 7 segments (0-6) with 2 vertices each = 14 vertices (0-13), plus 1 tip vertex (14)
   float vertID = vertIndex;
   
-  // Temporary structure - will update when we see tutorial's approach
-  // Assuming: 7 segments (0-6), each with left (even) and right (odd) vertices
-  float segmentID = floor(vertID / 2.0);
-  float xSide = mod(vertID, 2.0); // 0 = left, 1 = right
-  float heightPercent = segmentID / 6.0; // 0 to 1 along blade height
+  // Check if this is the tip vertex (vertex 14)
+  bool isTip = (vertID >= 14.0);
+  
+  float segmentID;
+  float xSide;
+  float heightPercent;
+  
+  if (isTip) {
+    // Tip vertex: centered point at the very top
+    segmentID = 7.0; // Tip is above segment 6
+    xSide = 0.5; // Center (0.5 means centered, not left or right)
+    heightPercent = 1.0; // At the very top
+  } else {
+    // Regular segment vertices: 7 segments (0-6), each with left (even) and right (odd) vertices
+    segmentID = floor(vertID / 2.0);
+    xSide = mod(vertID, 2.0); // 0 = left, 1 = right
+    // Use power function to pack segments closer at the top (more triangular shape)
+    // Higher power = more segments near the tip, more triangular
+    float normalizedSegment = segmentID / 7.0; // 0 to 1
+    heightPercent = pow(normalizedSegment, 1.5); // Power of 1.5 creates triangular distribution
+    // Scale to 0 to 6/7 range, leaving room for tip at 1.0
+    heightPercent = heightPercent * (6.0 / 7.0);
+  }
   
   // Calculate blade dimensions
   float grassHeight = grassSize.y * randomHeight;
-  float grassWidth = grassSize.x * (1.0 - heightPercent); // Taper to tip
+  // Taper to tip but keep minimum width (30% of base width) so tips aren't too thin
+  float tipWidthRatio = 0.3; // Tip width as ratio of base width
+  float grassWidth;
+  
+  if (isTip) {
+    // Tip is a point, so width is 0
+    grassWidth = 0.0;
+  } else {
+    // Taper from base to tip with minimum width
+    grassWidth = grassSize.x * mix(tipWidthRatio, 1.0, 1.0 - heightPercent);
+  }
   
   // Position of this vertex
   // Blade is created in local space: x = width, y = height, z = 0
   // The blade stands vertically, so base is at y=0, tip is at y=grassHeight
   // IMPORTANT: The base vertex (heightPercent=0) must be at y=0 to stay on ground
-  float x = (xSide - 0.5) * grassWidth; // Width (left/right)
+  float x = (xSide - 0.5) * grassWidth; // Width (left/right) - for tip, xSide=0.5 so x=0
   float y = heightPercent * grassHeight; // Height (up from base, 0 to grassHeight)
   float z = 0.0; // Blade is flat (no depth)
   
@@ -195,39 +222,18 @@ void main() {
   vec3 rotatedNormal1 = rotateY(PI * 0.3) * grassVertexNormal;
   vec3 rotatedNormal2 = rotateY(PI * -0.3) * grassVertexNormal;
   
-  // Wind effects - wind direction is based on position only (not time) to prevent constant rotation
-  // Sample noise based only on position to give each blade a consistent wind direction
-  float windDir = noise12(grassBladeWorldPos.xz * 0.05);
-  windDir = remap(windDir, 0.0, 1.0, -1.0, 1.0);
-  windDir = remap(windDir, -1.0, 1.0, 0.0, PI * 2.0);
+  // Wind effects - DISABLED for now (will bring back later)
+  // Wind direction and bend set to 0 to disable all wind movement
+  float windDir = 0.0;
+  float windBend = 0.0;
   
-  // Another noise sample for the strength of the wind.
-  float windNoiseSample = noise12(grassBladeWorldPos.xz * 0.25 + time);
-  
-  // Try and shape it a bit with easeIn(), this is pretty arbitrary.
-  windNoiseSample = remap(windNoiseSample, 0.0, 1.0, -1.0, 1.0);
-  float windLeanAngle = remap(windNoiseSample, -1.0, 1.0, 0.25, 1.0);
-  windLeanAngle = easeIn(windLeanAngle, 2.0) * 1.25;
-  
-  // Apply curve/lean to blade - matches tutorial exactly!
-  // Surprisingly, this works pretty ok
+  // Apply curve/lean to blade - static curve only (no animated noise)
   float curveAmount = randomLean * heightPercent;
   
-  // Sample noise using time + world position.
-  float noiseSample = noise12(vec2(time * 0.35) + grassBladeWorldPos.xz);
-  
-  // Add the animated noise onto the grass curve.
-  curveAmount += noiseSample * 0.1;
-  
-  // Apply wind rotation - creates smooth bend from base, not hook
-  // Reduce wind strength and apply more subtly to avoid hook shape
-  float windBend = windLeanAngle * heightPercent * 0.15; // Reduced multiplier for smoother effect
-  
-  // Rotate around Y axis to orient in wind direction, then X axis for the bend
-  // This creates a smooth lean from base, not a hook
-  mat3 windRotY = rotateY(windDir);
-  mat3 windRotX = rotateX(windBend);
-  mat3 windMat = windRotY * windRotX;
+  // Wind matrix - identity matrix (no wind rotation or bend)
+  mat3 windRotY = rotateY(windDir); // Will be identity since windDir = 0
+  mat3 windRotX = rotateX(windBend); // Will be identity since windBend = 0
+  mat3 windMat = windRotY * windRotX; // Identity matrix = no wind effect
   
   // Create a 3x3 rotation matrix around x (for forward/backward lean)
   mat3 grassMat = rotateX(curveAmount);
@@ -272,14 +278,13 @@ void main() {
 
   // Color gradient from base to tip - matches tutorial exactly
   // I just picked 2 colours, darker green and a yellowish colour.
-  // Lighter green color matching #59b01c (RGB: 89, 176, 28)
-  vec3 baseColour = vec3(0.349, 0.690, 0.110); // Lighter green base color #59b01c (RGB: 89, 176, 28)
-  vec3 tipColour = vec3(0.98, 0.92, 0.35); // Bright yellow tip color #FAEB59 (RGB: 250, 235, 89) - more yellow
+  // Brightened to pastel tones to match tutorial's bright appearance
+  vec3 baseColour = vec3(0.4, 0.7, 0.3); // Bright pastel green base
+  vec3 tipColour = vec3(0.9, 0.9, 0.6); // Bright pastel yellow tip
   
   // Do a gradient from base to tip, controlled by shaping function.
-  // Remap heightPercent to make tip color appear earlier (covers ~50% of blade)
-  float gradientFactor = clamp(remap(heightPercent, 0.0, 0.5, 0.0, 1.0), 0.0, 1.0);
-  vec3 diffuseColour = mix(baseColour, tipColour, easeIn(gradientFactor, 2.0));
+  // Lower power value (2.0 instead of 4.0) makes tip color appear earlier and cover more of the blade
+  vec3 diffuseColour = mix(baseColour, tipColour, easeIn(heightPercent, 2.0));
   
   vColor = diffuseColour;
   vHeightPercent = heightPercent;
@@ -333,8 +338,11 @@ void main() {
   
   // Apply view space adjustment
   // xDirection: -0.5 for left edge, +0.5 for right edge
-  float xDirection = (xSide - 0.5);
-  mvPosition.x += viewSpaceThickenFactor * xDirection * grassWidth;
+  // Don't apply view-space thickening to the tip (it's a point, width = 0)
+  if (!isTip) {
+    float xDirection = (xSide - 0.5);
+    mvPosition.x += viewSpaceThickenFactor * xDirection * grassWidth;
+  }
   
   // Final projected position
   vec4 projectedPosition = projectionMatrix * mvPosition;
@@ -411,7 +419,7 @@ void main() {
   // Density is in the range [0, 1]
   // 0 being no grass
   // 1 being full grass
-  float aoForDensity = mix(1.0, 0.7, density); // Reduced AO intensity - fully dense areas get less shading (higher minimum value)
+  float aoForDensity = mix(1.0, 0.25, density);
   
   // Adjust based on height - base is darker, tip is brighter
   float ao = mix(aoForDensity, 1.0, easeIn(vHeightPercent, 2.0));
@@ -496,8 +504,8 @@ export default function Grass({
     const getHeightAt = terrainMesh ? getHeightAtBVH : getHeightAtHeightData;
     // Create offset positions for each grass blade - matches tutorial exactly
     const offsets = [];
-    const NUM_GRASS_X = 32; // 32x32 = 1024 blades (matches tutorial exactly)
-    const NUM_GRASS_Y = 32;
+    const NUM_GRASS_X = 64; // 64x64 = 4096 blades (increased density)
+    const NUM_GRASS_Y = 64;
 
     for (let i = 0; i < NUM_GRASS_X; ++i) {
       const x = i / NUM_GRASS_Y - 0.5; // Matches tutorial: (i / NUM_GRASS_Y) - 0.5
