@@ -223,7 +223,7 @@ export const Experience = () => {
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
-          minDistance={10}
+          minDistance={1}
           maxDistance={2000}
         />
       )}

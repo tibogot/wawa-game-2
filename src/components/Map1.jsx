@@ -15,6 +15,8 @@ import ClaudeGrassQuick2 from "./ClaudeGrassQuick2";
 import ClaudeGrassQuick3 from "./ClaudeGrassQuick3";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
+import GFS2 from "./GFS2";
+import { useGFS2Controls } from "./useGFS2Controls";
 import { useDynamicLeaves3Controls } from "./useDynamicLeaves3Controls";
 import { useSimonDevGrass21Controls } from "./useSimonDevGrass21Controls";
 import { useSimonDevGrass22Controls } from "./useSimonDevGrass22Controls";
@@ -293,6 +295,12 @@ export const Map1 = ({
   const claudeGrassQuick2Controls = useClaudeGrassQuick2Controls();
   // Get ClaudeGrassQuick3 controls
   const claudeGrassQuick3Controls = useClaudeGrassQuick3Controls();
+
+  // Get GFS2 controls
+  // Leva may flatten folder structure, so check both nested and flat
+  const gfs2Controls = useGFS2Controls();
+  const gfs2Enabled = gfs2Controls?.gfs2?.gfs2Enabled ?? gfs2Controls?.gfs2Enabled ?? false;
+  const gfs2ShowNormals = gfs2Controls?.gfs2?.showNormals ?? gfs2Controls?.showNormals ?? false;
 
   // Debug: log controls to see if they're updating
   useEffect(() => {
@@ -2091,6 +2099,19 @@ export const Map1 = ({
           grassHeight={1.5}
           lodDistance={15}
           maxDistance={100}
+        />
+      )}
+
+      {/* GFS2 - Shader-based grass system */}
+      {gfs2Enabled && (
+        <GFS2
+          heightData={null}
+          terrainSize={200}
+          terrainSegments={200}
+          terrainOffset={0}
+          terrainHeight={0}
+          showNormals={gfs2ShowNormals}
+          terrainMesh={null}
         />
       )}
 
