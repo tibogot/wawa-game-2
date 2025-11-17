@@ -230,6 +230,12 @@ void main() {
   // Apply curve/lean to blade - static curve only (no animated noise)
   float curveAmount = randomLean * heightPercent;
   
+  // Sample noise using time + world position.
+  float noiseSample = noise12(vec2(time * 0.35) + grassBladeWorldPos.xz);
+  
+  // Add the animated noise onto the grass curve.
+  curveAmount += noiseSample * 0.1;
+  
   // Wind matrix - identity matrix (no wind rotation or bend)
   mat3 windRotY = rotateY(windDir); // Will be identity since windDir = 0
   mat3 windRotX = rotateX(windBend); // Will be identity since windBend = 0
@@ -284,7 +290,7 @@ void main() {
   
   // Do a gradient from base to tip, controlled by shaping function.
   // Lower power value (2.0 instead of 4.0) makes tip color appear earlier and cover more of the blade
-  vec3 diffuseColour = mix(baseColour, tipColour, easeIn(heightPercent, 2.0));
+  vec3 diffuseColour = mix(baseColour, tipColour, easeIn(heightPercent, 1.0));
   
   vColor = diffuseColour;
   vHeightPercent = heightPercent;
