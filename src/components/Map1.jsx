@@ -79,6 +79,8 @@ import Ice from "./Ice";
 import Forest from "./ManciniForest";
 import { useWaterControls } from "./useWaterControls";
 import * as THREE from "three";
+import { useGLTF } from "@react-three/drei";
+import { OctahedralImposter } from "./Octahedralimposter";
 import {
   MeshBasicMaterial,
   MeshPhysicalMaterial,
@@ -101,6 +103,9 @@ export const Map1 = ({
   ...props
 }) => {
   const group = useRef();
+
+  // Load the tree model for comparison
+  const treeModel = useGLTF("/models/tree.glb");
 
   const { buildingGeometry, buildingPosition } = useMemo(() => {
     const width = 18 * scale;
@@ -307,8 +312,10 @@ export const Map1 = ({
   // Get GFS2 controls
   // Leva may flatten folder structure, so check both nested and flat
   const gfs2Controls = useGFS2Controls();
-  const gfs2Enabled = gfs2Controls?.gfs2?.gfs2Enabled ?? gfs2Controls?.gfs2Enabled ?? false;
-  const gfs2ShowNormals = gfs2Controls?.gfs2?.showNormals ?? gfs2Controls?.showNormals ?? false;
+  const gfs2Enabled =
+    gfs2Controls?.gfs2?.gfs2Enabled ?? gfs2Controls?.gfs2Enabled ?? false;
+  const gfs2ShowNormals =
+    gfs2Controls?.gfs2?.showNormals ?? gfs2Controls?.showNormals ?? false;
 
   // Debug: log controls to see if they're updating
   useEffect(() => {
@@ -1699,6 +1706,8 @@ export const Map1 = ({
           <TileMaterial textureScale={TILE_DENSITY} />
         </mesh>
       </RigidBody>
+
+      {/* Comparison impostor / tree temporarily removed */}
       {/* WindFlag to visualize global wind */}
       {windFlagEnabled && (
         <WindFlag
