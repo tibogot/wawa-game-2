@@ -14,6 +14,7 @@ import {
   TILE_REFERENCE_SIZE,
 } from "./tileMaterialConfig";
 import { TeleportationRequest } from "../types/teleportation";
+import { OctahedralForest } from "./OctahedralForestConsolidated/OctahedralForest";
 
 type Map17Props = {
   scale?: number;
@@ -215,6 +216,23 @@ export const Map17 = forwardRef<THREE.Mesh | null, Map17Props>(
             />
           );
         })}
+        <OctahedralForest
+          modelPath="/models/low_poly_flower-transformed.glb"
+          centerPosition={[0, 0, 0]}
+          minRadius={10}
+          radius={50}
+          treeCount={400}
+          terrainMesh={floorRef.current}
+          lodDistances={{ mid: 20, far: 100 }}
+          leavesAlphaTest={0.4}
+          leavesOpacity={1}
+          impostorSettings={{
+            spritesPerSide: 12,
+            textureSize: 1024,
+            useHemiOctahedron: true,
+            alphaClamp: 0.4,
+          }}
+        />
       </group>
     );
   }

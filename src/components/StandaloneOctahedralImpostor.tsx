@@ -866,3 +866,6 @@ StandaloneOctahedralImpostor.preload = (modelPath: string) => {
 export default StandaloneOctahedralImpostor;
 
 
+
+
+
