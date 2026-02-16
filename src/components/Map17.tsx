@@ -14,7 +14,7 @@ import {
   TILE_REFERENCE_SIZE,
 } from "./tileMaterialConfig";
 import { TeleportationRequest } from "../types/teleportation";
-import { OctahedralForest } from "./OctahedralForestConsolidated/OctahedralForest";
+import { OctahedralImpostorForest } from "./OctahedralImpostorForest";
 
 type Map17Props = {
   scale?: number;
@@ -216,7 +216,7 @@ export const Map17 = forwardRef<THREE.Mesh | null, Map17Props>(
             />
           );
         })}
-        <OctahedralForest
+        <OctahedralImpostorForest
           modelPath="/models/low_poly_flower-transformed.glb"
           centerPosition={[0, 0, 0]}
           minRadius={10}

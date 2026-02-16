@@ -15,6 +15,7 @@ import ClaudeGrassQuick2 from "./ClaudeGrassQuick2";
 import ClaudeGrassQuick3 from "./ClaudeGrassQuick3";
 import ClaudeGrassQuick4 from "./ClaudeGrassQuick4";
 import ClaudeGrassQuick5 from "./ClaudeGrassQuick5";
+import ClaudeGrassQuick6 from "./ClaudeGrassQuick6";
 import { ImpostorForest } from "./ImpostorForest";
 import { LeafPileMountain } from "./LeafPileMountain";
 import GFS2 from "./GFS2";
@@ -33,6 +34,7 @@ import useClaudeGrassQuick2Controls from "./useClaudeGrassQuick2Controls";
 import useClaudeGrassQuick3Controls from "./useClaudeGrassQuick3Controls";
 import useClaudeGrassQuick4Controls from "./useClaudeGrassQuick4Controls";
 import useClaudeGrassQuick5Controls from "./useClaudeGrassQuick5Controls";
+import useClaudeGrassQuick6Controls from "./useClaudeGrassQuick6Controls";
 import { useImpostorForestControls } from "./useImpostorForestControls";
 import { useLeafPileMountainControls } from "./useLeafPileMountainControls";
 import { useInstancedTreesControls } from "./useInstancedTreesControls";
@@ -308,6 +310,8 @@ export const Map1 = ({
   const claudeGrassQuick4Controls = useClaudeGrassQuick4Controls();
   // Get ClaudeGrassQuick5 controls
   const claudeGrassQuick5Controls = useClaudeGrassQuick5Controls();
+  // Get ClaudeGrassQuick6 controls
+  const claudeGrassQuick6Controls = useClaudeGrassQuick6Controls();
 
   // Get GFS2 controls
   // Leva may flatten folder structure, so check both nested and flat
@@ -2162,6 +2166,75 @@ export const Map1 = ({
           backscatterPower={claudeGrassQuick5Controls.backscatterPower}
           frontScatterStrength={claudeGrassQuick5Controls.frontScatterStrength}
           rimSSSStrength={claudeGrassQuick5Controls.rimSSSStrength}
+        />
+      )}
+
+      {/* ClaudeGrassQuick6 - Quick_Grass port (Fixed normals) */}
+      {claudeGrassQuick6Controls.enabled && (
+        <ClaudeGrassQuick6
+          playerPosition={characterPosition || [0, 0, 0]}
+          terrainSize={claudeGrassQuick6Controls.terrainSize}
+          heightScale={claudeGrassQuick6Controls.heightScale}
+          heightOffset={claudeGrassQuick6Controls.heightOffset}
+          grassWidth={claudeGrassQuick6Controls.grassWidth}
+          grassHeight={claudeGrassQuick6Controls.grassHeight}
+          grassDensity={claudeGrassQuick6Controls.grassDensity}
+          lodDistance={claudeGrassQuick6Controls.lodDistance}
+          maxDistance={claudeGrassQuick6Controls.maxDistance}
+          patchSize={claudeGrassQuick6Controls.patchSize}
+          gridSize={claudeGrassQuick6Controls.gridSize}
+          patchSpacing={claudeGrassQuick6Controls.patchSpacing}
+          windEnabled={claudeGrassQuick6Controls.windEnabled}
+          windStrength={claudeGrassQuick6Controls.windStrength}
+          windDirectionScale={claudeGrassQuick6Controls.windDirectionScale}
+          windDirectionSpeed={claudeGrassQuick6Controls.windDirectionSpeed}
+          windStrengthScale={claudeGrassQuick6Controls.windStrengthScale}
+          windStrengthSpeed={claudeGrassQuick6Controls.windStrengthSpeed}
+          playerInteractionEnabled={
+            claudeGrassQuick6Controls.playerInteractionEnabled
+          }
+          playerInteractionRepel={
+            claudeGrassQuick6Controls.playerInteractionRepel
+          }
+          playerInteractionRange={
+            claudeGrassQuick6Controls.playerInteractionRange
+          }
+          playerInteractionStrength={
+            claudeGrassQuick6Controls.playerInteractionStrength
+          }
+          playerInteractionHeightThreshold={
+            claudeGrassQuick6Controls.playerInteractionHeightThreshold
+          }
+          baseColor1={claudeGrassQuick6Controls.baseColor1}
+          baseColor2={claudeGrassQuick6Controls.baseColor2}
+          tipColor1={claudeGrassQuick6Controls.tipColor1}
+          tipColor2={claudeGrassQuick6Controls.tipColor2}
+          gradientCurve={claudeGrassQuick6Controls.gradientCurve}
+          aoEnabled={claudeGrassQuick6Controls.aoEnabled}
+          aoIntensity={claudeGrassQuick6Controls.aoIntensity}
+          fogEnabled={claudeGrassQuick6Controls.fogEnabled}
+          fogNear={claudeGrassQuick6Controls.fogNear}
+          fogFar={claudeGrassQuick6Controls.fogFar}
+          fogIntensity={claudeGrassQuick6Controls.fogIntensity}
+          fogColor={claudeGrassQuick6Controls.fogColor}
+          specularEnabled={claudeGrassQuick6Controls.specularEnabled}
+          specularIntensity={claudeGrassQuick6Controls.specularIntensity}
+          specularColor={claudeGrassQuick6Controls.specularColor}
+          specularDirectionX={claudeGrassQuick6Controls.specularDirectionX}
+          specularDirectionY={claudeGrassQuick6Controls.specularDirectionY}
+          specularDirectionZ={claudeGrassQuick6Controls.specularDirectionZ}
+          grassMiddleBrightnessMin={
+            claudeGrassQuick6Controls.grassMiddleBrightnessMin
+          }
+          grassMiddleBrightnessMax={
+            claudeGrassQuick6Controls.grassMiddleBrightnessMax
+          }
+          backscatterEnabled={claudeGrassQuick6Controls.backscatterEnabled}
+          backscatterIntensity={claudeGrassQuick6Controls.backscatterIntensity}
+          backscatterColor={claudeGrassQuick6Controls.backscatterColor}
+          backscatterPower={claudeGrassQuick6Controls.backscatterPower}
+          frontScatterStrength={claudeGrassQuick6Controls.frontScatterStrength}
+          rimSSSStrength={claudeGrassQuick6Controls.rimSSSStrength}
         />
       )}
 
