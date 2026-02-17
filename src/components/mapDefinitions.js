@@ -20,6 +20,7 @@ import { Map19 } from "./Map19";
 import { Map20 } from "./Map20";
 import { Map21 } from "./Map21";
 import { Map22 } from "./Map22";
+import { Map23 } from "./Map23";
 
 const createDefaultProps = () => ({
   scale: 1,
@@ -188,6 +189,13 @@ export const mapDefinitions = {
     component: Map22,
     getDefaultProps: createDefaultProps,
     getCharacterSpawn: createStaticSpawn([0, 100, 0]), // Higher spawn - will be adjusted based on terrain
+    requiresTerrainReadyCallback: true,
+    passCharacterData: true,
+  },
+  map23: {
+    component: Map23,
+    getDefaultProps: createDefaultProps,
+    getCharacterSpawn: createStaticSpawn([0, 25, 0]),
     requiresTerrainReadyCallback: true,
     passCharacterData: true,
   },

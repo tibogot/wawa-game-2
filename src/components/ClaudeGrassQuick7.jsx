@@ -971,6 +971,7 @@ export default function ClaudeGrassQuick7({
   terrainSize = 100,
   heightScale = 1,
   heightOffset = 0,
+  externalHeightmap = null, // Optional external heightmap texture (overrides internal flat one)
   grassWidth = 0.1,
   grassHeight = 1.5,
   lodDistance = 15,
@@ -1283,6 +1284,9 @@ export default function ClaudeGrassQuick7({
     uf.grassParams.value.w = heightOffset;
     uf.grassDraw.value.set(lodDistance, maxDistance, 0, 0);
     uf.heightParams.value.x = terrainSize;
+    if (externalHeightmap) {
+      uf.heightmap.value = externalHeightmap;
+    }
     uf.windParams.value.set(
       windDirectionScale,
       windDirectionSpeed,
