@@ -17,6 +17,8 @@ import { useGrassClaude4Controls } from "./useGrassClaude4Controls";
 import { useGrassClaude5Controls } from "./useGrassClaude5Controls";
 import { HeightFog } from "./HeightFog";
 import { useHeightFogControls } from "./useHeightFogControls";
+import { HeightFogV2 } from "./HeightFogV2";
+import { useHeightFogV2Controls } from "./useHeightFogV2Controls";
 import { CloudSystem } from "./CloudSystem";
 import { useLensFlareControls } from "./useLensFlareControls";
 import LensFlare from "./LensFlare";
@@ -200,6 +202,17 @@ export const Map9 = forwardRef(
     // Get Height Fog controls from hook
     const { heightFogEnabled, fogColor, fogHeight, fogNear, fogFar } =
       useHeightFogControls();
+
+    // Get Height Fog V2 controls
+    const {
+      heightFogV2Enabled,
+      fogV2Color,
+      fogV2Height,
+      fogV2Near,
+      fogV2Far,
+      fogV2Density,
+      fogV2HeightFalloff,
+    } = useHeightFogV2Controls();
 
     // Get LensFlare controls
     const {
@@ -940,6 +953,19 @@ export const Map9 = forwardRef(
             fogHeight={fogHeight}
             fogNear={fogNear}
             fogFar={fogFar}
+          />
+        )}
+
+        {/* HeightFog V2 — separate fog with density/falloff controls */}
+        {isTerrainMeshReady && (
+          <HeightFogV2
+            enabled={heightFogV2Enabled}
+            fogColor={fogV2Color}
+            fogHeight={fogV2Height}
+            fogNear={fogV2Near}
+            fogFar={fogV2Far}
+            fogDensity={fogV2Density}
+            fogHeightFalloff={fogV2HeightFalloff}
           />
         )}
 

@@ -328,11 +328,8 @@ void main() {
 
   hashVal1 = hash42(vec2(grassBladeWorldPos.x, grassBladeWorldPos.z));
 
-  // Use XZ-only distance for LOD/culling — Y difference (camera height, terrain elevation)
-  // should not affect what's "near" vs "far" for ground-plane grass
-  float grassDistXZ = distance(cameraPosition.xz, grassBladeWorldPos.xz);
-  highLODOut = smoothstep(grassDraw.x * 0.5, grassDraw.x, grassDistXZ);
-  lodFadeIn = smoothstep(grassDraw.x, grassDraw.y, grassDistXZ);
+  highLODOut = smoothstep(grassDraw.x * 0.5, grassDraw.x, distance(cameraPosition, grassBladeWorldPos));
+  lodFadeIn = smoothstep(grassDraw.x, grassDraw.y, distance(cameraPosition, grassBladeWorldPos));
 
   // Check terrain type
   isSandy = linearstep(-11.0, -14.0, grassBladeWorldPos.y);
@@ -1098,8 +1095,6 @@ export default function ClaudeGrassQuick7({
           shininess: 0,
           side: THREE.FrontSide,
         });
-        mat.fog = false; // Grass has its own built-in fog system
-        mat.userData.isGrassShader = true; // Flag for HeightFog to skip this material
 
         mat.onBeforeCompile = (shader) => {
           shader.uniforms.grassSize = {
@@ -1203,12 +1198,22 @@ export default function ClaudeGrassQuick7({
           // Specular V2 uniforms
           shader.uniforms.uSpecularV2Enabled = { value: specularV2Enabled };
           shader.uniforms.uSpecularV2Intensity = { value: specularV2Intensity };
-          shader.uniforms.uSpecularV2Color = { value: specularV2ColorRef.current.clone() };
-          shader.uniforms.uSpecularV2Direction = {
-            value: new THREE.Vector3(specularV2DirectionX, specularV2DirectionY, specularV2DirectionZ).normalize(),
+          shader.uniforms.uSpecularV2Color = {
+            value: specularV2ColorRef.current.clone(),
           };
-          shader.uniforms.uSpecularV2NoiseScale = { value: specularV2NoiseScale };
-          shader.uniforms.uSpecularV2NoiseStrength = { value: specularV2NoiseStrength };
+          shader.uniforms.uSpecularV2Direction = {
+            value: new THREE.Vector3(
+              specularV2DirectionX,
+              specularV2DirectionY,
+              specularV2DirectionZ,
+            ).normalize(),
+          };
+          shader.uniforms.uSpecularV2NoiseScale = {
+            value: specularV2NoiseScale,
+          };
+          shader.uniforms.uSpecularV2NoiseStrength = {
+            value: specularV2NoiseStrength,
+          };
           shader.uniforms.uSpecularV2Power = { value: specularV2Power };
           shader.uniforms.uSpecularV2TipBias = { value: specularV2TipBias };
 
@@ -1336,7 +1341,9 @@ export default function ClaudeGrassQuick7({
     uf.uSpecularV2Enabled.value = specularV2Enabled;
     uf.uSpecularV2Intensity.value = specularV2Intensity;
     uf.uSpecularV2Color.value.copy(specularV2ColorRef.current);
-    uf.uSpecularV2Direction.value.set(specularV2DirectionX, specularV2DirectionY, specularV2DirectionZ).normalize();
+    uf.uSpecularV2Direction.value
+      .set(specularV2DirectionX, specularV2DirectionY, specularV2DirectionZ)
+      .normalize();
     uf.uSpecularV2NoiseScale.value = specularV2NoiseScale;
     uf.uSpecularV2NoiseStrength.value = specularV2NoiseStrength;
     uf.uSpecularV2Power.value = specularV2Power;
@@ -1450,7 +1457,6 @@ export default function ClaudeGrassQuick7({
         poolIdx.current++;
 
         mesh.position.set(currentCell.x, 0, currentCell.z);
-        mesh.frustumCulled = false; // We do our own frustum culling; disable Three.js auto-culling which doesn't account for shader heightmap displacement
         mesh.visible = true;
       }
     }

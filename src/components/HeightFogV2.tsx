@@ -2,20 +2,24 @@ import React, { useEffect, useRef } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
-interface HeightFogProps {
+interface HeightFogV2Props {
   enabled?: boolean;
   fogColor?: string;
   fogHeight?: number;
   fogNear?: number;
   fogFar?: number;
+  fogDensity?: number;
+  fogHeightFalloff?: number;
 }
 
-export const HeightFog: React.FC<HeightFogProps> = ({
+export const HeightFogV2: React.FC<HeightFogV2Props> = ({
   enabled = true,
-  fogColor = "#cccccc",
-  fogHeight = 50.0,
+  fogColor = "#b8c4d4",
+  fogHeight = 80.0,
   fogNear = 1,
-  fogFar = 2300,
+  fogFar = 1500,
+  fogDensity = 0.5,
+  fogHeightFalloff = 1.0,
 }) => {
   const { scene } = useThree();
   const shadersModified = useRef(false);
@@ -41,21 +45,23 @@ export const HeightFog: React.FC<HeightFogProps> = ({
     // Modify vertex shader to pass world position
     THREE.ShaderChunk.fog_pars_vertex += `
 #ifdef USE_FOG
-  varying vec3 vWorldPosition;
+  varying vec3 vWorldPositionV2;
 #endif
 `;
 
     THREE.ShaderChunk.fog_vertex += `
 #ifdef USE_FOG
-  vWorldPosition = worldPosition.xyz;
+  vWorldPositionV2 = worldPosition.xyz;
 #endif
 `;
 
-    // Modify fragment shader to include height uniform
+    // Modify fragment shader to include height + density uniforms
     THREE.ShaderChunk.fog_pars_fragment += `
 #ifdef USE_FOG
-  varying vec3 vWorldPosition;
-  uniform float fogHeight;
+  varying vec3 vWorldPositionV2;
+  uniform float fogHeightV2;
+  uniform float fogDensityV2;
+  uniform float fogHeightFalloffV2;
 #endif
 `;
 
@@ -65,13 +71,13 @@ export const HeightFog: React.FC<HeightFogProps> = ({
     THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace(
       FOG_APPLIED_LINE,
       `
-  // Height-based fog factor
-  float heightFactor = smoothstep(fogHeight, 0.0, vWorldPosition.y);
-  float cameraHeightFactor = smoothstep(fogHeight, 0.0, cameraPosition.y);
-  
-  // Combine distance fog with height fog
-  fogFactor = fogFactor * max(heightFactor, cameraHeightFactor);
-  
+  // Height-based fog with density and falloff controls
+  float heightFactorV2 = 1.0 - smoothstep(0.0, fogHeightV2, pow(max(vWorldPositionV2.y, 0.0), 1.0 / fogHeightFalloffV2));
+  float cameraHeightFactorV2 = 1.0 - smoothstep(0.0, fogHeightV2, pow(max(cameraPosition.y, 0.0), 1.0 / fogHeightFalloffV2));
+
+  // Combine distance fog with height fog and density
+  fogFactor = fogFactor * max(heightFactorV2, cameraHeightFactorV2) * fogDensityV2;
+
   ${FOG_APPLIED_LINE}
 `
     );
@@ -111,11 +117,9 @@ export const HeightFog: React.FC<HeightFogProps> = ({
     };
   }, [enabled, fogColor, fogNear, fogFar, scene]);
 
-  // Update materials with fogHeight uniform
+  // Update materials with fog uniforms — skip grass materials
   useEffect(() => {
     if (!enabled || !shadersModified.current) return;
-
-    let materialsUpdated = 0;
 
     scene.traverse((object) => {
       if (object instanceof THREE.Mesh) {
@@ -134,42 +138,36 @@ export const HeightFog: React.FC<HeightFogProps> = ({
             material instanceof THREE.MeshPhongMaterial ||
             material instanceof THREE.MeshToonMaterial
           ) {
-            // Enable fog
             material.fog = true;
 
-            // Chain onBeforeCompile instead of replacing it
-            // This preserves existing shader modifications (like grass materials)
             const originalOnBeforeCompile = material.onBeforeCompile;
 
-            // Only set onBeforeCompile if it hasn't been set by us already
-            if (!(material as any).userData.heightFogApplied) {
+            // Use a separate key to avoid conflicting with HeightFog V1
+            if (!(material as any).userData.heightFogV2Applied) {
               material.onBeforeCompile = (shader, renderer) => {
-                // Call original onBeforeCompile first (preserves grass shader code, etc.)
                 if (originalOnBeforeCompile) {
                   originalOnBeforeCompile(shader, renderer);
                 }
 
-                // Then add fogHeight uniform
-                shader.uniforms.fogHeight = { value: fogHeight };
+                shader.uniforms.fogHeightV2 = { value: fogHeight };
+                shader.uniforms.fogDensityV2 = { value: fogDensity };
+                shader.uniforms.fogHeightFalloffV2 = { value: fogHeightFalloff };
 
-                // Store the shader for later updates
-                (material as any).userData.shader = shader;
+                // Store under separate key so we don't overwrite grass shader refs
+                (material as any).userData.heightFogV2Shader = shader;
               };
 
-              // Mark this material as having fog applied to avoid reapplying
-              (material as any).userData.heightFogApplied = true;
+              (material as any).userData.heightFogV2Applied = true;
             }
 
-            // Force recompilation
             material.needsUpdate = true;
-            materialsUpdated++;
           }
         });
       }
     });
-  }, [enabled, scene, fogHeight]);
+  }, [enabled, scene, fogHeight, fogDensity, fogHeightFalloff]);
 
-  // Update fogHeight when it changes
+  // Update uniforms when controls change
   useEffect(() => {
     if (!enabled) return;
 
@@ -180,14 +178,22 @@ export const HeightFog: React.FC<HeightFogProps> = ({
           : [object.material];
 
         materials.forEach((material) => {
-          const shader = (material as any).userData?.shader;
-          if (shader && shader.uniforms.fogHeight) {
-            shader.uniforms.fogHeight.value = fogHeight;
+          const shader = (material as any).userData?.heightFogV2Shader;
+          if (shader) {
+            if (shader.uniforms.fogHeightV2) {
+              shader.uniforms.fogHeightV2.value = fogHeight;
+            }
+            if (shader.uniforms.fogDensityV2) {
+              shader.uniforms.fogDensityV2.value = fogDensity;
+            }
+            if (shader.uniforms.fogHeightFalloffV2) {
+              shader.uniforms.fogHeightFalloffV2.value = fogHeightFalloff;
+            }
           }
         });
       }
     });
-  }, [enabled, fogHeight, scene]);
+  }, [enabled, fogHeight, fogDensity, fogHeightFalloff, scene]);
 
   return null;
 };
