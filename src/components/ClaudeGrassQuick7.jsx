@@ -563,6 +563,16 @@ uniform float uBackscatterPower;
 uniform float uFrontScatterStrength;
 uniform float uRimSSSStrength;
 
+// Specular V2 uniforms
+uniform bool uSpecularV2Enabled;
+uniform float uSpecularV2Intensity;
+uniform vec3 uSpecularV2Color;
+uniform vec3 uSpecularV2Direction;
+uniform float uSpecularV2NoiseScale;
+uniform float uSpecularV2NoiseStrength;
+uniform float uSpecularV2Power;
+uniform float uSpecularV2TipBias;
+
 // Utility functions
 // Note: saturate might be defined by Three.js, so we check and undefine if needed
 #ifdef saturate
@@ -578,6 +588,22 @@ float linearstep(float edge0, float edge1, float x) {
 
 float easeIn(float t, float p) {
   return pow(t, p);
+}
+
+// Hash for specular V2 noise
+float hash_frag(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float noise_frag(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash_frag(i);
+  float b = hash_frag(i + vec2(1.0, 0.0));
+  float c = hash_frag(i + vec2(0.0, 1.0));
+  float d = hash_frag(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
 // OkLab color space functions for fog
@@ -797,7 +823,35 @@ void main() {
     vec3 specular = uSpecularColor * spec * uSpecularIntensity * distanceFalloff * tipFalloff * 3.0;
     reflectedLight.directSpecular += specular;
   }
-  
+
+  // Specular V2 - scattered glints with noise-perturbed normals
+  if (uSpecularV2Enabled && uSpecularV2Intensity > 0.0) {
+    vec3 v2ViewDir = normalize(-vViewPosition);
+    vec3 v2SpecDir = normalize(uSpecularV2Direction);
+
+    // Perturb normal with world-space noise to break up the highlight into glints
+    vec2 noiseUV = vWorldPosition.xz * uSpecularV2NoiseScale;
+    float n1v2 = noise_frag(noiseUV) * 2.0 - 1.0;
+    float n2v2 = noise_frag(noiseUV + vec2(73.7, 157.3)) * 2.0 - 1.0;
+    float n3v2 = noise_frag(noiseUV * 2.7 + vec2(31.1, 97.5)) * 2.0 - 1.0;
+
+    // Build perturbed normal - noise offsets in world XZ, keeping mostly upward
+    vec3 perturbedNormal = normalize(normal + vec3(n1v2, n3v2 * 0.3, n2v2) * uSpecularV2NoiseStrength);
+
+    vec3 v2ReflectDir = reflect(-v2SpecDir, perturbedNormal);
+    float v2Spec = pow(max(dot(v2ViewDir, v2ReflectDir), 0.0), uSpecularV2Power);
+
+    // Distance falloff
+    float v2Depth = length(vViewPosition);
+    float v2DistFalloff = smoothstep(2.0, 10.0, v2Depth);
+
+    // Tip bias - control how much specular favors tips vs full blade
+    float v2TipFalloff = smoothstep(1.0 - uSpecularV2TipBias, 1.0, heightPercent);
+
+    vec3 v2Color = uSpecularV2Color * v2Spec * uSpecularV2Intensity * v2DistFalloff * v2TipFalloff;
+    reflectedLight.directSpecular += v2Color;
+  }
+
   #include <aomap_fragment>
   
   outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;
@@ -962,6 +1016,16 @@ export default function ClaudeGrassQuick7({
   frontScatterStrength = 0.3,
   rimSSSStrength = 0.5,
   minSkyBlend = 0.35,
+  specularV2Enabled = false,
+  specularV2Intensity = 1.5,
+  specularV2Color = "#ffffff",
+  specularV2DirectionX = -1.0,
+  specularV2DirectionY = 0.45,
+  specularV2DirectionZ = 1.0,
+  specularV2NoiseScale = 3.0,
+  specularV2NoiseStrength = 0.6,
+  specularV2Power = 12.0,
+  specularV2TipBias = 0.5,
   grassDensity = 3072, // Number of grass blades per patch (default: 32*32*3)
 }) {
   const groupRef = useRef();
@@ -985,6 +1049,7 @@ export default function ClaudeGrassQuick7({
   const fogColorRef = useRef(convertSRGBToLinear(fogColor));
   const specularColorRef = useRef(convertSRGBToLinear(specularColor));
   const backscatterColorRef = useRef(convertSRGBToLinear(backscatterColor));
+  const specularV2ColorRef = useRef(convertSRGBToLinear(specularV2Color));
 
   // Update color refs when props change - convert to linear space
   useEffect(() => {
@@ -1002,6 +1067,8 @@ export default function ClaudeGrassQuick7({
     specularColorRef.current.copy(spec);
     const backscatter = convertSRGBToLinear(backscatterColor);
     backscatterColorRef.current.copy(backscatter);
+    const specV2 = convertSRGBToLinear(specularV2Color);
+    specularV2ColorRef.current.copy(specV2);
   }, [
     baseColor1,
     baseColor2,
@@ -1010,6 +1077,7 @@ export default function ClaudeGrassQuick7({
     fogColor,
     specularColor,
     backscatterColor,
+    specularV2Color,
   ]);
 
   // Create geometries and materials - recreate when grassDensity changes
@@ -1125,6 +1193,18 @@ export default function ClaudeGrassQuick7({
           };
           shader.uniforms.uRimSSSStrength = { value: rimSSSStrength };
           shader.uniforms.uMinSkyBlend = { value: minSkyBlend };
+
+          // Specular V2 uniforms
+          shader.uniforms.uSpecularV2Enabled = { value: specularV2Enabled };
+          shader.uniforms.uSpecularV2Intensity = { value: specularV2Intensity };
+          shader.uniforms.uSpecularV2Color = { value: specularV2ColorRef.current.clone() };
+          shader.uniforms.uSpecularV2Direction = {
+            value: new THREE.Vector3(specularV2DirectionX, specularV2DirectionY, specularV2DirectionZ).normalize(),
+          };
+          shader.uniforms.uSpecularV2NoiseScale = { value: specularV2NoiseScale };
+          shader.uniforms.uSpecularV2NoiseStrength = { value: specularV2NoiseStrength };
+          shader.uniforms.uSpecularV2Power = { value: specularV2Power };
+          shader.uniforms.uSpecularV2TipBias = { value: specularV2TipBias };
 
           // Replace shaders with complete versions
           shader.vertexShader = vertexShader;
@@ -1244,6 +1324,14 @@ export default function ClaudeGrassQuick7({
     uf.uFrontScatterStrength.value = frontScatterStrength;
     uf.uRimSSSStrength.value = rimSSSStrength;
     uf.uMinSkyBlend.value = minSkyBlend;
+    uf.uSpecularV2Enabled.value = specularV2Enabled;
+    uf.uSpecularV2Intensity.value = specularV2Intensity;
+    uf.uSpecularV2Color.value.copy(specularV2ColorRef.current);
+    uf.uSpecularV2Direction.value.set(specularV2DirectionX, specularV2DirectionY, specularV2DirectionZ).normalize();
+    uf.uSpecularV2NoiseScale.value = specularV2NoiseScale;
+    uf.uSpecularV2NoiseStrength.value = specularV2NoiseStrength;
+    uf.uSpecularV2Power.value = specularV2Power;
+    uf.uSpecularV2TipBias.value = specularV2TipBias;
   };
 
   // Pool index refs for zero-allocation mesh reuse

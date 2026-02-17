@@ -253,6 +253,77 @@ export default function useClaudeGrassQuickControls7() {
           { collapsed: true }
         ),
 
+        // Specular V2 Controls (scattered glints)
+        specularV2: folder(
+          {
+            specularV2Enabled: {
+              value: false,
+              label: "Enable Specular V2",
+            },
+            specularV2Intensity: {
+              value: 1.5,
+              min: 0.0,
+              max: 5.0,
+              step: 0.1,
+              label: "Intensity",
+            },
+            specularV2Color: {
+              value: "#ffffff",
+              label: "Color",
+            },
+            specularV2DirectionX: {
+              value: -1.0,
+              min: -1.0,
+              max: 1.0,
+              step: 0.1,
+              label: "Direction X",
+            },
+            specularV2DirectionY: {
+              value: 0.45,
+              min: -1.0,
+              max: 1.0,
+              step: 0.05,
+              label: "Direction Y",
+            },
+            specularV2DirectionZ: {
+              value: 1.0,
+              min: -1.0,
+              max: 1.0,
+              step: 0.1,
+              label: "Direction Z",
+            },
+            specularV2NoiseScale: {
+              value: 3.0,
+              min: 0.1,
+              max: 20.0,
+              step: 0.1,
+              label: "Noise Scale (Glint Size)",
+            },
+            specularV2NoiseStrength: {
+              value: 0.6,
+              min: 0.0,
+              max: 2.0,
+              step: 0.05,
+              label: "Noise Strength (Scatter)",
+            },
+            specularV2Power: {
+              value: 12.0,
+              min: 1.0,
+              max: 64.0,
+              step: 1.0,
+              label: "Power (Sharpness)",
+            },
+            specularV2TipBias: {
+              value: 0.5,
+              min: 0.0,
+              max: 1.0,
+              step: 0.05,
+              label: "Tip Bias",
+            },
+          },
+          { collapsed: true }
+        ),
+
         // Backscatter/SSS Controls
         backscatter: folder(
           {
@@ -380,6 +451,7 @@ export default function useClaudeGrassQuickControls7() {
     ...(raw.colors || {}),
     ...(raw.advanced || {}),
     ...(raw.specular || {}),
+    ...(raw.specularV2 || {}),
     ...(raw.backscatter || {}),
     ...(raw.fog || {}),
     ...(raw.playerInteraction || {}),

@@ -2309,6 +2309,16 @@ export const Map1 = ({
           frontScatterStrength={claudeGrassQuick7Controls.frontScatterStrength}
           rimSSSStrength={claudeGrassQuick7Controls.rimSSSStrength}
           minSkyBlend={claudeGrassQuick7Controls.minSkyBlend}
+          specularV2Enabled={claudeGrassQuick7Controls.specularV2Enabled}
+          specularV2Intensity={claudeGrassQuick7Controls.specularV2Intensity}
+          specularV2Color={claudeGrassQuick7Controls.specularV2Color}
+          specularV2DirectionX={claudeGrassQuick7Controls.specularV2DirectionX}
+          specularV2DirectionY={claudeGrassQuick7Controls.specularV2DirectionY}
+          specularV2DirectionZ={claudeGrassQuick7Controls.specularV2DirectionZ}
+          specularV2NoiseScale={claudeGrassQuick7Controls.specularV2NoiseScale}
+          specularV2NoiseStrength={claudeGrassQuick7Controls.specularV2NoiseStrength}
+          specularV2Power={claudeGrassQuick7Controls.specularV2Power}
+          specularV2TipBias={claudeGrassQuick7Controls.specularV2TipBias}
         />
       )}
 
