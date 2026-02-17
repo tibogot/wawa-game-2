@@ -32,7 +32,7 @@ export const Map17 = forwardRef<THREE.Mesh | null, Map17Props>(
       onTeleportRequest,
       ...props
     }: Map17Props,
-    ref
+    ref,
   ) => {
     const floorRef = useRef<THREE.Mesh | null>(null);
 
@@ -45,7 +45,7 @@ export const Map17 = forwardRef<THREE.Mesh | null, Map17Props>(
           ref.current = value;
         }
       },
-      [ref]
+      [ref],
     );
 
     useEffect(() => {
@@ -59,7 +59,7 @@ export const Map17 = forwardRef<THREE.Mesh | null, Map17Props>(
         [
           { size: [18, 60, 14], position: [-30, 30, -20] },
         ] satisfies BuildingConfig[],
-      []
+      [],
     );
 
     const teleportDoors = useMemo<TeleportDoorConfig[]>(
@@ -97,7 +97,7 @@ export const Map17 = forwardRef<THREE.Mesh | null, Map17Props>(
           frameColor: "#ff8cf7",
         },
       ],
-      []
+      [],
     );
 
     const teleportDoorLookup = useMemo(() => {
@@ -235,7 +235,7 @@ export const Map17 = forwardRef<THREE.Mesh | null, Map17Props>(
         />
       </group>
     );
-  }
+  },
 );
 
 Map17.displayName = "Map17";
@@ -293,9 +293,9 @@ const TeleportationDoor = ({
       new THREE.Vector3(
         mapPosition[0] + door.position[0] * mapScale,
         mapPosition[1] + door.position[1] * mapScale,
-        mapPosition[2] + door.position[2] * mapScale
+        mapPosition[2] + door.position[2] * mapScale,
       ),
-    [door.position, mapPosition, mapScale]
+    [door.position, mapPosition, mapScale],
   );
 
   const targetWorld = useMemo(
@@ -303,9 +303,9 @@ const TeleportationDoor = ({
       new THREE.Vector3(
         mapPosition[0] + targetDoor.position[0] * mapScale,
         mapPosition[1] + targetDoor.position[1] * mapScale,
-        mapPosition[2] + targetDoor.position[2] * mapScale
+        mapPosition[2] + targetDoor.position[2] * mapScale,
       ),
-    [targetDoor.position, mapPosition, mapScale]
+    [targetDoor.position, mapPosition, mapScale],
   );
 
   const activationRadius = (door.activationRadius ?? 1.5) * mapScale;
