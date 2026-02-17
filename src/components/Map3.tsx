@@ -12,6 +12,8 @@ import { FloatingLeaves } from "./FloatingLeaves";
 import { CloudSystem } from "./CloudSystem";
 import { DynamicLeaves as DynamicLeaves3 } from "./DynamicLeaves3";
 import { SimonDevGrass21 } from "./SimonDevGrass21/SimonDevGrass21";
+import ClaudeGrassQuick6 from "./ClaudeGrassQuick6.jsx";
+import useClaudeGrassQuick6Controls from "./useClaudeGrassQuick6Controls.js";
 import { useMountainControls } from "./useMountainControls";
 import { useWindFlagControls } from "./useWindFlagControls";
 import { useButterflyParticlesControls } from "./useButterflyParticlesControls";
@@ -135,6 +137,10 @@ export const Map3 = ({
 
   // Get SimonDevGrass21 controls from separate hook
   const { simonDevGrass21Enabled } = useSimonDevGrass21Controls();
+
+  // Get ClaudeGrassQuick6 controls from separate hook (adds to FOLIAGE menu)
+  const claudeGrassQuick6Controls = useClaudeGrassQuick6Controls();
+  const cg6 = claudeGrassQuick6Controls.claudeGrassQuick6 ?? claudeGrassQuick6Controls;
 
   // Get debug spheres controls
   const { showDebugSpheres } = useDebugSpheresControls();
@@ -297,6 +303,60 @@ export const Map3 = ({
           grassScale={1.0}
           getGroundHeight={getTerrainHeight}
           characterPosition={characterPosition || fallbackPosition}
+        />
+      )}
+      {/* ClaudeGrassQuick6 Grass System - in FOLIAGE menu */}
+      {cg6?.enabled && (
+        <ClaudeGrassQuick6
+          playerPosition={characterPosition || fallbackPosition}
+          terrainSize={cg6.terrainSize ?? 100}
+          heightScale={cg6.heightScale ?? 1}
+          heightOffset={cg6.heightOffset ?? 0}
+          grassWidth={cg6.grassWidth ?? 0.1}
+          grassHeight={cg6.grassHeight ?? 0.8}
+          lodDistance={cg6.lodDistance ?? 15}
+          maxDistance={cg6.maxDistance ?? 100}
+          patchSize={cg6.patchSize ?? 10}
+          gridSize={cg6.gridSize ?? 16}
+          patchSpacing={cg6.patchSpacing ?? 10}
+          windEnabled={cg6.wind?.windEnabled ?? true}
+          windStrength={cg6.wind?.windStrength ?? 1.25}
+          windDirectionScale={cg6.wind?.windDirectionScale ?? 0.05}
+          windDirectionSpeed={cg6.wind?.windDirectionSpeed ?? 0.05}
+          windStrengthScale={cg6.wind?.windStrengthScale ?? 0.25}
+          windStrengthSpeed={cg6.wind?.windStrengthSpeed ?? 1.0}
+          playerInteractionEnabled={cg6.playerInteraction?.playerInteractionEnabled ?? true}
+          playerInteractionRepel={cg6.playerInteraction?.playerInteractionRepel ?? true}
+          playerInteractionRange={cg6.playerInteraction?.playerInteractionRange ?? 2.5}
+          playerInteractionStrength={cg6.playerInteraction?.playerInteractionStrength ?? 0.2}
+          playerInteractionHeightThreshold={cg6.playerInteraction?.playerInteractionHeightThreshold ?? 3.0}
+          baseColor1={cg6.colors?.baseColor1 ?? "#051303"}
+          baseColor2={cg6.colors?.baseColor2 ?? "#061a03"}
+          tipColor1={cg6.colors?.tipColor1 ?? "#a6cc40"}
+          tipColor2={cg6.colors?.tipColor2 ?? "#cce666"}
+          gradientCurve={cg6.colors?.gradientCurve ?? 4.0}
+          aoEnabled={cg6.advanced?.aoEnabled ?? true}
+          aoIntensity={cg6.advanced?.aoIntensity ?? 1.0}
+          grassMiddleBrightnessMin={cg6.advanced?.grassMiddleBrightnessMin ?? 0.85}
+          grassMiddleBrightnessMax={cg6.advanced?.grassMiddleBrightnessMax ?? 1.0}
+          fogEnabled={cg6.fog?.fogEnabled ?? false}
+          fogNear={cg6.fog?.fogNear ?? 5.0}
+          fogFar={cg6.fog?.fogFar ?? 50.0}
+          fogIntensity={cg6.fog?.fogIntensity ?? 1.0}
+          fogColor={cg6.fog?.fogColor ?? "#4f74af"}
+          specularEnabled={cg6.specular?.specularEnabled ?? false}
+          specularIntensity={cg6.specular?.specularIntensity ?? 2.0}
+          specularColor={cg6.specular?.specularColor ?? "#ffffff"}
+          specularDirectionX={cg6.specular?.specularDirectionX ?? -1.0}
+          specularDirectionY={cg6.specular?.specularDirectionY ?? 1.0}
+          specularDirectionZ={cg6.specular?.specularDirectionZ ?? 0.5}
+          backscatterEnabled={cg6.backscatter?.backscatterEnabled ?? true}
+          backscatterIntensity={cg6.backscatter?.backscatterIntensity ?? 0.5}
+          backscatterColor={cg6.backscatter?.backscatterColor ?? "#51cc66"}
+          backscatterPower={cg6.backscatter?.backscatterPower ?? 2.0}
+          frontScatterStrength={cg6.backscatter?.frontScatterStrength ?? 0.3}
+          rimSSSStrength={cg6.backscatter?.rimSSSStrength ?? 0.5}
+          grassDensity={cg6.grassDensity ?? 3072}
         />
       )}
       {/* Mountain */}

@@ -725,8 +725,17 @@ export const OctahedralImpostorForest: React.FC<
         }
       });
 
-      // Step 3: Merge geometries with groups
-      const geometries = meshes.map((m) => m.geometry);
+      // Step 3: Transform geometries to world space (match GLB hierarchy so model stands correctly)
+      // and merge. Same approach as YellowFlower: apply matrixWorld so orientation/scale match
+      // the scene (and thus the impostor atlas).
+      const geometries = meshes.map((m) => {
+        m.updateMatrixWorld(true);
+        const cloned = m.geometry.clone();
+        cloned.applyMatrix4(m.matrixWorld);
+        cloned.computeVertexNormals();
+        cloned.computeBoundingSphere();
+        return cloned;
+      });
       const materials = meshes.map((m) => m.material as THREE.Material);
       const mergedGeo = mergeGeometries(geometries, true);
 

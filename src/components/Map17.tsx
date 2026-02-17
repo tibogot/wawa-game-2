@@ -217,7 +217,7 @@ export const Map17 = forwardRef<THREE.Mesh | null, Map17Props>(
           );
         })}
         <OctahedralImpostorForest
-          modelPath="/models/low_poly_flower-transformed.glb"
+          modelPath="/models/tree.glb"
           centerPosition={[0, 0, 0]}
           minRadius={10}
           radius={50}
