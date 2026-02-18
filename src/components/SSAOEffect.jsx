@@ -4,6 +4,7 @@ import { useThree } from "@react-three/fiber";
 import { EffectComposer, SMAA, N8AO, Bloom } from "@react-three/postprocessing";
 import { BlendFunction, SMAAPreset } from "postprocessing";
 import { useControls, folder } from "leva";
+import { PostProcessingHeightFog } from "./PostProcessingHeightFog";
 
 /**
  * Post-Processing Effects
@@ -36,6 +37,13 @@ export const SSAOEffect = () => {
     bloomMipmapBlur,
     antiAliasingMode,
     smaaPreset,
+    ppFogEnabled,
+    ppFogColor,
+    ppFogHeight,
+    ppFogNear,
+    ppFogFar,
+    ppFogDensity,
+    ppFogHeightFalloff,
   } = useControls("🎬 POST PROCESSING", {
     masterToggle: folder(
       {
@@ -168,6 +176,54 @@ export const SSAOEffect = () => {
       },
       { collapsed: true }
     ),
+    postProcessingFog: folder(
+      {
+        ppFogEnabled: {
+          value: false,
+          label: "🌫️ Enable PP Height Fog",
+        },
+        ppFogColor: {
+          value: "#b8c4d4",
+          label: "Fog Color",
+        },
+        ppFogHeight: {
+          value: 80,
+          min: 0,
+          max: 300,
+          step: 5,
+          label: "Fog Height",
+        },
+        ppFogNear: {
+          value: 1,
+          min: 0.1,
+          max: 100,
+          step: 1,
+          label: "Fog Near",
+        },
+        ppFogFar: {
+          value: 1500,
+          min: 10,
+          max: 5000,
+          step: 10,
+          label: "Fog Far",
+        },
+        ppFogDensity: {
+          value: 0.5,
+          min: 0,
+          max: 1,
+          step: 0.01,
+          label: "Fog Density",
+        },
+        ppFogHeightFalloff: {
+          value: 1.0,
+          min: 0.1,
+          max: 5,
+          step: 0.1,
+          label: "Height Falloff",
+        },
+      },
+      { collapsed: true }
+    ),
   });
 
   // Set up color management
@@ -225,6 +281,18 @@ export const SSAOEffect = () => {
               luminanceSmoothing={bloomLuminanceSmoothing}
               mipmapBlur={bloomMipmapBlur}
               blendFunction={BlendFunction.SCREEN}
+            />
+          )}
+
+          {/* Post-Processing Height Fog */}
+          {ppFogEnabled && (
+            <PostProcessingHeightFog
+              fogColor={ppFogColor}
+              fogHeight={ppFogHeight}
+              fogNear={ppFogNear}
+              fogFar={ppFogFar}
+              fogDensity={ppFogDensity}
+              fogHeightFalloff={ppFogHeightFalloff}
             />
           )}
 
