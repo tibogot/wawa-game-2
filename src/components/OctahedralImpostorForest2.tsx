@@ -277,7 +277,7 @@ const _sphere = new THREE.Sphere();
 function computeObjectBoundingSphere(
   obj: THREE.Object3D,
   target = new THREE.Sphere(),
-  forceCompute = false
+  forceCompute = false,
 ): THREE.Sphere {
   target.makeEmpty();
 
@@ -325,7 +325,7 @@ const _coords = new THREE.Vector2();
 const _userDataMaterialKey = "_oif_originalMaterial";
 
 function createTextureAtlas(
-  params: CreateTextureAtlasParams
+  params: CreateTextureAtlasParams,
 ): TextureAtlasResult {
   const { renderer, target, useHemiOctahedron } = params;
 
@@ -391,7 +391,9 @@ function createTextureAtlas(
   // Override materials with atlas baking shader
   overrideTargetMaterial(target);
 
-  console.log("[OctahedralImpostorForest] Baking atlas with temp Scene + AmbientLight, toneMapping disabled");
+  console.log(
+    "[OctahedralImpostorForest] Baking atlas with temp Scene + AmbientLight, toneMapping disabled",
+  );
 
   // Render all views
   for (let row = 0; row < countPerSide; row++) {
@@ -437,13 +439,13 @@ function createTextureAtlas(
     _oldViewport.x,
     _oldViewport.y,
     _oldViewport.z,
-    _oldViewport.w
+    _oldViewport.w,
   );
   renderer.setScissor(
     _oldScissor.x,
     _oldScissor.y,
     _oldScissor.z,
-    _oldScissor.w
+    _oldScissor.w,
   );
   renderer.setPixelRatio(oldPixelRatio);
   renderer.setClearAlpha(oldClearAlpha);
@@ -470,7 +472,7 @@ function createTextureAtlas(
   }
 
   function createBakingMaterial(
-    material: THREE.Material
+    material: THREE.Material,
   ): THREE.ShaderMaterial {
     const uniforms: { [uniform: string]: THREE.IUniform } = {
       map: { value: (material as THREE.MeshStandardMaterial).map },
@@ -581,28 +583,25 @@ function injectImpostorShaders(material: THREE.Material): void {
     shader.uniforms = { ...shader.uniforms, ...material._oifUniforms };
 
     shader.vertexShader = shader.vertexShader
-      .replace(
-        "#include <clipping_planes_pars_vertex>",
-        IMPOSTOR_PARAMS_VERTEX
-      )
+      .replace("#include <clipping_planes_pars_vertex>", IMPOSTOR_PARAMS_VERTEX)
       .replace("#include <project_vertex>", IMPOSTOR_VERTEX);
 
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <clipping_planes_pars_fragment>",
-        IMPOSTOR_PARAMS_FRAGMENT
+        IMPOSTOR_PARAMS_FRAGMENT,
       )
       .replace(
         "#include <normal_fragment_begin>",
-        IMPOSTOR_NORMAL_FRAGMENT_BEGIN
+        IMPOSTOR_NORMAL_FRAGMENT_BEGIN,
       )
       .replace(
         "#include <normal_fragment_maps>",
-        "// #include <normal_fragment_maps>"
+        "// #include <normal_fragment_maps>",
       )
       .replace(
         "#include <map_fragment>",
-        `${IMPOSTOR_MAP_FRAGMENT}\n\tdiffuseColor *= blendedColor;`
+        `${IMPOSTOR_MAP_FRAGMENT}\n\tdiffuseColor *= blendedColor;`,
       );
 
     onBeforeCompileBase?.call(material, shader, renderer);
@@ -615,7 +614,7 @@ function injectImpostorShaders(material: THREE.Material): void {
     const useNormal = !!material._oifDefines?.EZ_USE_NORMAL;
     const transparent = !!material.transparent;
     return `oif_${hemiOcta}_${transparent}_${useNormal}_${customProgramCacheKeyBase.call(
-      material
+      material,
     )}`;
   };
 }
@@ -634,7 +633,7 @@ class OctahedralImpostorMesh extends THREE.Mesh<
     const sphere = computeObjectBoundingSphere(
       params.target,
       new THREE.Sphere(),
-      true
+      true,
     );
 
     this.scale.multiplyScalar(sphere.radius * 2);
@@ -697,11 +696,10 @@ export const OctahedralImpostorForest: React.FC<
   useEffect(() => {
     if (!scene) return;
 
-    let isCancelled = false;
-    let createdMesh: (InstancedMesh2 & { camera?: THREE.Camera }) | null = null;
-
     const setupForest = async () => {
-      console.log("[OctahedralImpostorForest] NEW COMPONENT RUNNING - v2 with temp Scene fix");
+      console.log(
+        "[OctahedralImpostorForest] NEW COMPONENT RUNNING - v2 with temp Scene fix",
+      );
 
       // Step 1: Extract meshes from model
       const meshes: THREE.Mesh[] = [];
@@ -757,7 +755,7 @@ export const OctahedralImpostorForest: React.FC<
           const raycaster = new THREE.Raycaster();
           raycaster.set(
             new THREE.Vector3(x, 1000, z),
-            new THREE.Vector3(0, -1, 0)
+            new THREE.Vector3(0, -1, 0),
           );
           const intersects = raycaster.intersectObject(terrainMesh, false);
           if (intersects.length > 0) {
@@ -775,8 +773,6 @@ export const OctahedralImpostorForest: React.FC<
         capacity: positions.length,
       }) as unknown as InstancedMesh2 & { camera?: THREE.Camera };
 
-      createdMesh = iMesh;
-
       iMesh.camera = camera;
       iMesh.castShadow = true;
       iMesh.receiveShadow = true;
@@ -793,20 +789,11 @@ export const OctahedralImpostorForest: React.FC<
       // Step 7: LOD 1 - meshoptimizer simplified
       try {
         const LODGeo = await simplifyGeometriesByError(geometries, [0, 0.01]);
-        if (isCancelled) {
-          iMesh.dispose();
-          return;
-        }
         const mergedGeoLOD = mergeGeometries(LODGeo, true);
         const clonedMaterials = materials.map((m) => m.clone());
         iMesh.addLOD(mergedGeoLOD, clonedMaterials, lodDistances.mid);
       } catch (error) {
         console.error("OctahedralImpostorForest: LOD 1 failed:", error);
-      }
-
-      if (isCancelled) {
-        iMesh.dispose();
-        return;
       }
 
       // Step 8: LOD 2 - Octahedral impostor (FIXED with temp Scene + lights)
@@ -827,11 +814,6 @@ export const OctahedralImpostorForest: React.FC<
         console.error("OctahedralImpostorForest: Impostor LOD failed:", error);
       }
 
-      if (isCancelled) {
-        iMesh.dispose();
-        return;
-      }
-
       // Step 9: Compute BVH for frustum culling
       iMesh.computeBVH();
 
@@ -843,15 +825,11 @@ export const OctahedralImpostorForest: React.FC<
     setupForest();
 
     return () => {
-      isCancelled = true;
       if (instancedMeshRef.current) {
         threeScene.remove(instancedMeshRef.current);
         instancedMeshRef.current.dispose();
         instancedMeshRef.current = null;
-      } else if (createdMesh) {
-        createdMesh.dispose();
       }
-      createdMesh = null;
     };
   }, [
     scene,

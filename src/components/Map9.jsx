@@ -54,6 +54,8 @@ import { ShorelineEffect } from "./ShorelineEffect";
 import { useShorelineEffectControls } from "./useShorelineEffectControls";
 import { ImpostorForest } from "./ImpostorForest";
 import { useImpostorForestControls } from "./useImpostorForestControls";
+import { OctahedralImpostorForest } from "./OctahedralImpostorForest";
+import { useOctahedralImpostorForestControls } from "./useOctahedralImpostorForestControls";
 import { DeerController } from "./DeerController";
 import { DeerHerd } from "./DeerHerd";
 import { InstancedTrees } from "./InstancedTrees";
@@ -412,6 +414,36 @@ export const Map9 = forwardRef(
       leavesOpacity,
       impostorAlphaClamp,
     } = useImpostorForestControls();
+
+    // Get OctahedralImpostorForest controls
+    const {
+      enabled: octaForestEnabled,
+      treeCount: octaTreeCount,
+      radius: octaRadius,
+      minRadius: octaMinRadius,
+      lodMid: octaLodMid,
+      lodFar: octaLodFar,
+      leavesAlphaTest: octaLeavesAlphaTest,
+      leavesOpacity: octaLeavesOpacity,
+      impostorAlphaClamp: octaImpostorAlphaClamp,
+      impostorSpritesPerSide: octaImpostorSpritesPerSide,
+      impostorTextureSize: octaImpostorTextureSize,
+    } = useOctahedralImpostorForestControls();
+
+    const octaForestLodDistances = useMemo(
+      () => ({ mid: octaLodMid, far: octaLodFar }),
+      [octaLodMid, octaLodFar]
+    );
+
+    const octaForestImpostorSettings = useMemo(
+      () => ({
+        spritesPerSide: octaImpostorSpritesPerSide,
+        textureSize: octaImpostorTextureSize,
+        useHemiOctahedron: true,
+        alphaClamp: octaImpostorAlphaClamp,
+      }),
+      [octaImpostorSpritesPerSide, octaImpostorTextureSize, octaImpostorAlphaClamp]
+    );
 
     // Get InstancedTrees controls
     const {
@@ -1512,6 +1544,22 @@ export const Map9 = forwardRef(
             leavesAlphaTest={leavesAlphaTest}
             leavesOpacity={leavesOpacity}
             impostorAlphaClamp={impostorAlphaClamp}
+          />
+        )}
+
+        {/* Octahedral Impostor Forest */}
+        {octaForestEnabled && heightmapLookup && (
+          <OctahedralImpostorForest
+            modelPath="/models/tree.glb"
+            centerPosition={[0, 0, 0]}
+            minRadius={octaMinRadius}
+            radius={octaRadius}
+            treeCount={octaTreeCount}
+            getTerrainHeight={getGroundHeight}
+            lodDistances={octaForestLodDistances}
+            leavesAlphaTest={octaLeavesAlphaTest}
+            leavesOpacity={octaLeavesOpacity}
+            impostorSettings={octaForestImpostorSettings}
           />
         )}
 

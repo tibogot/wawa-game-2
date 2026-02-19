@@ -15,6 +15,7 @@ import {
 } from "./tileMaterialConfig";
 import { TeleportationRequest } from "../types/teleportation";
 import { OctahedralImpostorForest } from "./OctahedralImpostorForest";
+import { useOctahedralImpostorForestControls } from "./useOctahedralImpostorForestControls";
 
 type Map17Props = {
   scale?: number;
@@ -105,6 +106,35 @@ export const Map17 = forwardRef<THREE.Mesh | null, Map17Props>(
       teleportDoors.forEach((door) => lookup.set(door.id, door));
       return lookup;
     }, [teleportDoors]);
+
+    const {
+      enabled: forestEnabled,
+      treeCount,
+      radius,
+      minRadius,
+      lodMid,
+      lodFar,
+      leavesAlphaTest,
+      leavesOpacity,
+      impostorAlphaClamp,
+      impostorSpritesPerSide,
+      impostorTextureSize,
+    } = useOctahedralImpostorForestControls();
+
+    const forestLodDistances = useMemo(
+      () => ({ mid: lodMid, far: lodFar }),
+      [lodMid, lodFar],
+    );
+
+    const forestImpostorSettings = useMemo(
+      () => ({
+        spritesPerSide: impostorSpritesPerSide,
+        textureSize: impostorTextureSize,
+        useHemiOctahedron: true,
+        alphaClamp: impostorAlphaClamp,
+      }),
+      [impostorSpritesPerSide, impostorTextureSize, impostorAlphaClamp],
+    );
 
     const buildingGeometries = useMemo(() => {
       const tileSize = 1 / TILE_DENSITY;
@@ -216,23 +246,20 @@ export const Map17 = forwardRef<THREE.Mesh | null, Map17Props>(
             />
           );
         })}
-        <OctahedralImpostorForest
-          modelPath="/models/tree.glb"
-          centerPosition={[0, 0, 0]}
-          minRadius={10}
-          radius={50}
-          treeCount={400}
-          terrainMesh={floorRef.current}
-          lodDistances={{ mid: 20, far: 100 }}
-          leavesAlphaTest={0.4}
-          leavesOpacity={1}
-          impostorSettings={{
-            spritesPerSide: 12,
-            textureSize: 1024,
-            useHemiOctahedron: true,
-            alphaClamp: 0.4,
-          }}
-        />
+        {forestEnabled && (
+          <OctahedralImpostorForest
+            modelPath="/models/tree.glb"
+            centerPosition={[0, 0, 0]}
+            minRadius={minRadius}
+            radius={radius}
+            treeCount={treeCount}
+            terrainMesh={floorRef.current}
+            lodDistances={forestLodDistances}
+            leavesAlphaTest={leavesAlphaTest}
+            leavesOpacity={leavesOpacity}
+            impostorSettings={forestImpostorSettings}
+          />
+        )}
       </group>
     );
   },
