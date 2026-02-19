@@ -84,7 +84,7 @@ export const Map9 = forwardRef(
       onTerrainReady,
       ...props
     },
-    ref
+    ref,
   ) => {
     const group = useRef(null);
     const [heightmapLookup, setHeightmapLookup] = useState(null);
@@ -432,7 +432,7 @@ export const Map9 = forwardRef(
 
     const octaForestLodDistances = useMemo(
       () => ({ mid: octaLodMid, far: octaLodFar }),
-      [octaLodMid, octaLodFar]
+      [octaLodMid, octaLodFar],
     );
 
     const octaForestImpostorSettings = useMemo(
@@ -442,7 +442,11 @@ export const Map9 = forwardRef(
         useHemiOctahedron: true,
         alphaClamp: octaImpostorAlphaClamp,
       }),
-      [octaImpostorSpritesPerSide, octaImpostorTextureSize, octaImpostorAlphaClamp]
+      [
+        octaImpostorSpritesPerSide,
+        octaImpostorTextureSize,
+        octaImpostorAlphaClamp,
+      ],
     );
 
     // Get InstancedTrees controls
@@ -675,7 +679,7 @@ export const Map9 = forwardRef(
             label: "📍 Center Z",
           },
         },
-        { collapsed: true }
+        { collapsed: true },
       ),
       forest: folder(
         {
@@ -726,7 +730,7 @@ export const Map9 = forwardRef(
             label: "📍 Position Z",
           },
         },
-        { collapsed: true }
+        { collapsed: true },
       ),
     });
 
@@ -747,7 +751,7 @@ export const Map9 = forwardRef(
               label: "⬆️ Spawn Height",
             },
           },
-          { collapsed: true }
+          { collapsed: true },
         ),
       });
 
@@ -758,7 +762,7 @@ export const Map9 = forwardRef(
     // Callback when ProceduralTerrain4 heightmap is ready
     const handleHeightmapReady = useCallback((fn) => {
       console.log(
-        "✅ Map9 received heightmap lookup from ProceduralTerrain4 (Simplex)"
+        "✅ Map9 received heightmap lookup from ProceduralTerrain4 (Simplex)",
       );
       setHeightmapLookup(() => fn);
       // Mark terrain mesh as ready after a short delay to ensure materials are compiled
@@ -776,7 +780,7 @@ export const Map9 = forwardRef(
         }
         return heightmapLookup(x, z);
       },
-      [heightmapLookup]
+      [heightmapLookup],
     );
 
     const deerSpawnPosition = useMemo(() => {
@@ -843,7 +847,7 @@ export const Map9 = forwardRef(
         textureSize,
         textureSize,
         THREE.RedFormat,
-        THREE.FloatType
+        THREE.FloatType,
       );
       texture.needsUpdate = true;
       texture.wrapS = THREE.ClampToEdgeWrapping;
@@ -934,7 +938,7 @@ export const Map9 = forwardRef(
     // Debug: Log the calculated height
     if (windFlagEnabled && heightmapLookup) {
       console.log(
-        `Map9 - WindFlag at [${windFlagPosition[0]}, ${windFlagPosition[2]}] -> terrain height: ${windFlagTerrainHeight}`
+        `Map9 - WindFlag at [${windFlagPosition[0]}, ${windFlagPosition[2]}] -> terrain height: ${windFlagTerrainHeight}`,
       );
     }
 
@@ -959,7 +963,7 @@ export const Map9 = forwardRef(
     // Debug: Log the calculated height
     if (adBillboardEnabled && heightmapLookup) {
       console.log(
-        `Map9 - AdBillboard at [${adBillboardPosition[0]}, ${adBillboardPosition[2]}] -> terrain height: ${adBillboardTerrainHeight}`
+        `Map9 - AdBillboard at [${adBillboardPosition[0]}, ${adBillboardPosition[2]}] -> terrain height: ${adBillboardTerrainHeight}`,
       );
     }
 
@@ -1185,11 +1189,21 @@ export const Map9 = forwardRef(
               windDirectionSpeed={claudeGrassQuick7Controls.windDirectionSpeed}
               windStrengthScale={claudeGrassQuick7Controls.windStrengthScale}
               windStrengthSpeed={claudeGrassQuick7Controls.windStrengthSpeed}
-              playerInteractionEnabled={claudeGrassQuick7Controls.playerInteractionEnabled}
-              playerInteractionRepel={claudeGrassQuick7Controls.playerInteractionRepel}
-              playerInteractionRange={claudeGrassQuick7Controls.playerInteractionRange}
-              playerInteractionStrength={claudeGrassQuick7Controls.playerInteractionStrength}
-              playerInteractionHeightThreshold={claudeGrassQuick7Controls.playerInteractionHeightThreshold}
+              playerInteractionEnabled={
+                claudeGrassQuick7Controls.playerInteractionEnabled
+              }
+              playerInteractionRepel={
+                claudeGrassQuick7Controls.playerInteractionRepel
+              }
+              playerInteractionRange={
+                claudeGrassQuick7Controls.playerInteractionRange
+              }
+              playerInteractionStrength={
+                claudeGrassQuick7Controls.playerInteractionStrength
+              }
+              playerInteractionHeightThreshold={
+                claudeGrassQuick7Controls.playerInteractionHeightThreshold
+              }
               baseColor1={claudeGrassQuick7Controls.baseColor1}
               baseColor2={claudeGrassQuick7Controls.baseColor2}
               tipColor1={claudeGrassQuick7Controls.tipColor1}
@@ -1208,23 +1222,43 @@ export const Map9 = forwardRef(
               specularDirectionX={claudeGrassQuick7Controls.specularDirectionX}
               specularDirectionY={claudeGrassQuick7Controls.specularDirectionY}
               specularDirectionZ={claudeGrassQuick7Controls.specularDirectionZ}
-              grassMiddleBrightnessMin={claudeGrassQuick7Controls.grassMiddleBrightnessMin}
-              grassMiddleBrightnessMax={claudeGrassQuick7Controls.grassMiddleBrightnessMax}
+              grassMiddleBrightnessMin={
+                claudeGrassQuick7Controls.grassMiddleBrightnessMin
+              }
+              grassMiddleBrightnessMax={
+                claudeGrassQuick7Controls.grassMiddleBrightnessMax
+              }
               backscatterEnabled={claudeGrassQuick7Controls.backscatterEnabled}
-              backscatterIntensity={claudeGrassQuick7Controls.backscatterIntensity}
+              backscatterIntensity={
+                claudeGrassQuick7Controls.backscatterIntensity
+              }
               backscatterColor={claudeGrassQuick7Controls.backscatterColor}
               backscatterPower={claudeGrassQuick7Controls.backscatterPower}
-              frontScatterStrength={claudeGrassQuick7Controls.frontScatterStrength}
+              frontScatterStrength={
+                claudeGrassQuick7Controls.frontScatterStrength
+              }
               rimSSSStrength={claudeGrassQuick7Controls.rimSSSStrength}
               minSkyBlend={claudeGrassQuick7Controls.minSkyBlend}
               specularV2Enabled={claudeGrassQuick7Controls.specularV2Enabled}
-              specularV2Intensity={claudeGrassQuick7Controls.specularV2Intensity}
+              specularV2Intensity={
+                claudeGrassQuick7Controls.specularV2Intensity
+              }
               specularV2Color={claudeGrassQuick7Controls.specularV2Color}
-              specularV2DirectionX={claudeGrassQuick7Controls.specularV2DirectionX}
-              specularV2DirectionY={claudeGrassQuick7Controls.specularV2DirectionY}
-              specularV2DirectionZ={claudeGrassQuick7Controls.specularV2DirectionZ}
-              specularV2NoiseScale={claudeGrassQuick7Controls.specularV2NoiseScale}
-              specularV2NoiseStrength={claudeGrassQuick7Controls.specularV2NoiseStrength}
+              specularV2DirectionX={
+                claudeGrassQuick7Controls.specularV2DirectionX
+              }
+              specularV2DirectionY={
+                claudeGrassQuick7Controls.specularV2DirectionY
+              }
+              specularV2DirectionZ={
+                claudeGrassQuick7Controls.specularV2DirectionZ
+              }
+              specularV2NoiseScale={
+                claudeGrassQuick7Controls.specularV2NoiseScale
+              }
+              specularV2NoiseStrength={
+                claudeGrassQuick7Controls.specularV2NoiseStrength
+              }
               specularV2Power={claudeGrassQuick7Controls.specularV2Power}
               specularV2TipBias={claudeGrassQuick7Controls.specularV2TipBias}
             />
@@ -1736,5 +1770,5 @@ export const Map9 = forwardRef(
         )}
       </group>
     );
-  }
+  },
 );

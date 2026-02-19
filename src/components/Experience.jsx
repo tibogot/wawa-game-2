@@ -34,7 +34,7 @@ export const Experience = () => {
     },
     cameraMode: {
       value: "follow",
-      options: ["follow", "orbit", "follow-orbit"],
+      options: ["follow", "orbit", "follow-orbit", "game-camera"],
       label: "Camera Mode",
     },
   });

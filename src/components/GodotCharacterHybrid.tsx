@@ -411,8 +411,9 @@ export const GodotCharacterHybrid = ({
 
   // Mouse orbit controls for follow-orbit camera mode (delta-based with pointer lock)
   useEffect(() => {
-    if (cameraMode !== "follow-orbit") {
-      // Unlock pointer and reset if exiting follow-orbit mode
+    const usesMouseOrbit = cameraMode === "follow-orbit" || cameraMode === "game-camera";
+    if (!usesMouseOrbit) {
+      // Unlock pointer and reset if exiting orbit modes
       if (isPointerLocked.current && document.pointerLockElement) {
         document.exitPointerLock();
       }
@@ -470,7 +471,8 @@ export const GodotCharacterHybrid = ({
 
     // Handle mouse movement (delta-based)
     const handleMouseMove = (e: MouseEvent) => {
-      if (cameraMode !== "follow-orbit" || !isPointerLocked.current) return;
+      const inOrbitMode = cameraMode === "follow-orbit" || cameraMode === "game-camera";
+      if (!inOrbitMode || !isPointerLocked.current) return;
 
       // Use movementX and movementY (delta values) instead of absolute position
       // These represent how much the mouse moved since the last event
@@ -1059,7 +1061,7 @@ export const GodotCharacterHybrid = ({
         movement.walkBackwardMode = true;
       }
 
-      if (movement.x !== 0) {
+      if (movement.x !== 0 && cameraMode !== "game-camera") {
         rotationTarget.current += ROTATION_SPEED * movement.x;
       }
 
@@ -1075,9 +1077,12 @@ export const GodotCharacterHybrid = ({
           ? Math.atan2(movement.x, 1)
           : Math.atan2(movement.x, movement.z);
 
-        // Movement direction is based on character rotation, NOT camera orbit
-        // Camera orbit should only affect camera position, not movement direction
-        const movementRotation = rotationTarget.current + baseMovementAngle;
+        // In game-camera mode, movement is relative to camera facing direction
+        // In other modes, movement is based on character rotation only
+        const movementRotation =
+          cameraMode === "game-camera"
+            ? rotationTarget.current + mouseOrbitOffset.current + baseMovementAngle
+            : rotationTarget.current + baseMovementAngle;
 
         let intendedVelX = Math.sin(movementRotation) * speed;
         let intendedVelZ = Math.cos(movementRotation) * speed;
@@ -1203,6 +1208,11 @@ export const GodotCharacterHybrid = ({
           // Character rotation should be relative to base camera, not orbiting camera
           targetRotation =
             characterRotationTarget.current - mouseOrbitOffset.current;
+        } else if (cameraMode === "game-camera") {
+          // In game-camera, character faces the direction of movement relative to camera
+          // No counter-rotation needed: characterRotationTarget already holds the input angle,
+          // and the container already includes mouseOrbitOffset, so they combine correctly
+          targetRotation = characterRotationTarget.current;
         }
 
         character.current.rotation.y = lerpAngle(
@@ -1332,14 +1342,13 @@ export const GodotCharacterHybrid = ({
     }
 
     // CAMERA
-    if (cameraMode === "follow" || cameraMode === "follow-orbit") {
+    if (cameraMode === "follow" || cameraMode === "follow-orbit" || cameraMode === "game-camera") {
       // Base rotation follows character movement
       const baseRotation = rotationTarget.current;
 
-      // For follow-orbit, add mouse orbit offset to camera rotation ONLY
-      // The container holds camera position, so camera can orbit without affecting character
+      // For follow-orbit and game-camera, add mouse orbit offset to camera rotation ONLY
       const finalRotation =
-        cameraMode === "follow-orbit"
+        cameraMode === "follow-orbit" || cameraMode === "game-camera"
           ? baseRotation + mouseOrbitOffset.current
           : baseRotation;
 
@@ -1376,8 +1385,8 @@ export const GodotCharacterHybrid = ({
           );
         }
 
-        // For follow-orbit, adjust camera look-at target vertically based on accumulated vertical mouse offset
-        if (cameraMode === "follow-orbit") {
+        // For follow-orbit and game-camera, adjust camera look-at target vertically based on accumulated vertical mouse offset
+        if (cameraMode === "follow-orbit" || cameraMode === "game-camera") {
           // Apply vertical rotation offset (pitch) by adjusting look-at target height
           // mouseVerticalOffset is already accumulated and clamped, convert to vertical offset
           const verticalRotationOffset =
