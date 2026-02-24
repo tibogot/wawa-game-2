@@ -205,7 +205,6 @@ varying vec3 vGrassColour;
 varying vec4 vGrassParams;
 varying vec3 vNormal2;
 varying vec3 vWorldPosition;
-varying float vLodFadeIn;
 
 uniform vec2 grassSize;
 uniform vec4 grassParams;
@@ -228,7 +227,6 @@ uniform float uGradientCurve;
 uniform bool uAoEnabled;
 uniform float uAoIntensity;
 uniform float uMinSkyBlend;
-uniform float uMaxSkyBlend;
 
 attribute float vertIndex;
 
@@ -442,12 +440,11 @@ void main() {
   baseColour = mix(b1, b2, hashGrassColour.x);
   tipColour = mix(t1, t2, hashGrassColour.y);
   highLODColour = mix(baseColour, tipColour, easeIn(heightPercent, uGradientCurve)) * randomShade;
-  lowLODColour = mix(b1, t1, heightPercent) * randomShade;
+  lowLODColour = mix(b1, t1, heightPercent);
   vGrassColour = mix(highLODColour, lowLODColour, highLODOut);
   vGrassParams = vec4(heightPercent, grassBladeWorldPos.y, highLODOut, xSide);
-  vLodFadeIn = lodFadeIn;
 
-  SKY_RATIO = uMaxSkyBlend;
+  SKY_RATIO = 0.85;
   UP = vec3(0.0, 1.0, 0.0);
   skyFadeIn = mix(uMinSkyBlend, SKY_RATIO, highLODOut);
   normal1 = normalize(mix(grassVertexNormal1, UP, skyFadeIn));
@@ -518,7 +515,6 @@ varying vec3 vGrassColour;
 varying vec4 vGrassParams;
 varying vec3 vNormal2;
 varying vec3 vWorldPosition;
-varying float vLodFadeIn;
 // vViewPosition is provided by Three.js shader chunks, don't declare it
 
 #include <packing>
@@ -740,8 +736,6 @@ void main() {
 
   diffuseColor.rgb *= vGrassColour;
   diffuseColor.rgb *= mix(uGrassMiddleBrightnessMin, uGrassMiddleBrightnessMax, grassMiddle);
-  float _ff = 1.0 - smoothstep(0.4, 1.0, vLodFadeIn);
-  diffuseColor.rgb *= _ff * _ff;
 
   reflectedLight = ReflectedLight(vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
   totalEmissiveRadiance = emissive;
@@ -1026,7 +1020,6 @@ export default function ClaudeGrassQuick7({
   frontScatterStrength = 0.3,
   rimSSSStrength = 0.5,
   minSkyBlend = 0.35,
-  maxSkyBlend = 0.5,
   specularV2Enabled = false,
   specularV2Intensity = 1.5,
   specularV2Color = "#ffffff",
@@ -1206,7 +1199,6 @@ export default function ClaudeGrassQuick7({
           };
           shader.uniforms.uRimSSSStrength = { value: rimSSSStrength };
           shader.uniforms.uMinSkyBlend = { value: minSkyBlend };
-          shader.uniforms.uMaxSkyBlend = { value: maxSkyBlend };
 
           // Specular V2 uniforms
           shader.uniforms.uSpecularV2Enabled = { value: specularV2Enabled };
@@ -1351,7 +1343,6 @@ export default function ClaudeGrassQuick7({
     uf.uFrontScatterStrength.value = frontScatterStrength;
     uf.uRimSSSStrength.value = rimSSSStrength;
     uf.uMinSkyBlend.value = minSkyBlend;
-    uf.uMaxSkyBlend.value = maxSkyBlend;
     uf.uSpecularV2Enabled.value = specularV2Enabled;
     uf.uSpecularV2Intensity.value = specularV2Intensity;
     uf.uSpecularV2Color.value.copy(specularV2ColorRef.current);
